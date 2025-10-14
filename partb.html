@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part B: Trip Distribution - 4-Step Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: white; border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .card h2 { font-size: 1.5rem; font-weight: 700; color: #111827; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; }
+        .card h3 { font-size: 1.25rem; font-weight: 600; color: #374151; margin-top: 1.5rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: center; padding: 0.75rem; border: 1px solid #e5e7eb; position: relative; }
+        th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+        input[type="number"] { width: 100%; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; text-align: center; -moz-appearance: textfield; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease-in-out; border: none; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:disabled { background-color: #d1d5db; color: #6b7280; cursor: not-allowed; }
+        .btn-primary { background-color: #4f46e5; color: white; } .btn-primary:hover:not(:disabled) { background-color: #4338ca; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; } .btn-secondary:hover { background-color: #d1d5db; }
+        .notification { padding: 1rem; border-radius: 0.5rem; margin-top: 1.5rem; text-align: center; font-weight: 500; }
+        .notification-error { background-color: #fee2e2; color: #b91c1c; }
+        .notification-success { background-color: #dcfce7; color: #166534; }
+        .calculation-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #374151;
+            overflow-x: auto;
+        }
+        .formula { font-style: italic; color: #4b5563; margin-bottom: 0.5rem; display: block; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">The 4-Step Transportation Planning Model</h1>
+            <p class="text-lg text-gray-600 mt-2">Part B: Trip Distribution (Gravity Model)</p>
+        </header>
+
+        <nav class="bg-white rounded-lg shadow-sm mb-8 p-2 flex justify-center">
+             <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part A: Trip Generation</a>
+             <a href="partb.html" class="px-4 py-2 text-indigo-600 font-bold border-b-2 border-indigo-600">Part B: Trip Distribution</a>
+             <a href="partc.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part C: Mode Choice</a>
+             <a href="partd.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part D: Trip Assignment</a>
+        </nav>
+
+        <div id="inputsContainer" class="card">
+            <h2 class="text-2xl font-bold text-gray-800">Inputs</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4">
+                <div>
+                    <h3><span class="text-indigo-600">1.</span> Zonal Data</h3>
+                    <table id="zonalDataTable">
+                        <thead><tr><th>Zone</th><th>Productions (P)</th><th>Attractions (A)</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="flex justify-center gap-4 mt-4">
+                        <button id="addZoneBtn" class="btn btn-secondary">Add Zone</button>
+                        <button id="removeZoneBtn" class="btn btn-secondary">Remove Zone</button>
+                    </div>
+                </div>
+                <div>
+                    <h3><span class="text-indigo-600">2.</span> Travel Times (t)</h3>
+                    <div id="travelTimeContainer" class="overflow-x-auto"></div>
+                </div>
+                <div>
+                     <h3><span class="text-indigo-600">3.</span> Friction Factors (F)</h3>
+                     <table id="frictionFactorTable">
+                        <thead><tr><th>Time (min)</th><th>Friction Factor (F)</th></tr></thead>
+                        <tbody></tbody>
+                     </table>
+                     <div class="flex justify-center gap-4 mt-4">
+                        <button id="addFrictionRowBtn" class="btn btn-secondary">Add Row</button>
+                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="resultsMainContainer">
+            <div class="card">
+                <h2><span class="text-indigo-600">4.</span> Calculation & Results</h2>
+                <p class="text-gray-600 mb-4">Generate the intermediate tables and calculate the final trip distribution. Ensure productions and attractions are balanced before the final calculation.</p>
+                <div class="flex justify-center">
+                    <button id="generateInitialBtn" class="btn btn-primary">Start Calculation</button>
+                </div>
+                <div id="balanceNotification" class="mt-4"></div>
+                <div class="flex justify-center mt-4">
+                    <button id="balanceAttractionsBtn" class="btn btn-secondary" style="display: none;">Balance Attractions</button>
+                </div>
+            </div>
+            <div id="resultsContainer" style="display: none;">
+                <div class="card">
+                    <h3>Intermediate Table: A_j * F_ij * K_ij</h3>
+                    <p class="text-sm text-gray-500 mb-2">This table shows the product of attractions, friction factors, and K-factors (assumed to be 1) for each zone pair.</p>
+                    <div id="intermediateTableContainer" class="overflow-x-auto"></div>
+                </div>
+                <div class="card">
+                    <h3 class="mb-4">Final Result: Trip Distribution Table (T_ij)</h3>
+                    <div id="distributionSteps" class="space-y-6">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DEFAULT DATA ---
+        const defaultZonalData = [{ P: 140, A: 300 }, { P: 330, A: 270 }, { P: 280, A: 180 }];
+        const defaultTravelTimes = [[5, 2, 3], [2, 6, 6], [3, 6, 5]];
+        const defaultFrictionFactors = [{ t: 1, F: 82 }, { t: 2, F: 52 }, { t: 3, F: 50 }, { t: 4, F: 41 }, { t: 5, F: 39 }, { t: 6, F: 26 }, { t: 7, F: 20 }, { t: 8, F: 13 }];
+        
+        let numZones = 0;
+        let currentTripTable = [];
+        let adjustedAttractions = [];
+    
+        // --- UI ELEMENTS ---
+        const zonalTableBody = document.querySelector('#zonalDataTable tbody');
+        const travelTimeContainer = document.getElementById('travelTimeContainer');
+        const frictionTableBody = document.querySelector('#frictionFactorTable tbody');
+        const notificationEl = document.getElementById('balanceNotification');
+        const balanceBtn = document.getElementById('balanceAttractionsBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const distributionStepsContainer = document.getElementById('distributionSteps');
+    
+        // --- INITIALIZATION ---
+        const init = () => {
+            defaultZonalData.forEach(() => addZone());
+            document.querySelectorAll('#zonalDataTable .prod-input').forEach((input, i) => input.value = defaultZonalData[i].P);
+            document.querySelectorAll('#zonalDataTable .attr-input').forEach((input, i) => input.value = defaultZonalData[i].A);
+            updateTravelTimeTable();
+            document.querySelectorAll('#travelTimeTable input').forEach(input => { input.value = defaultTravelTimes[input.dataset.row][input.dataset.col]; });
+            frictionTableBody.innerHTML = '';
+            defaultFrictionFactors.forEach(ff => addFrictionRow(ff.t, ff.F));
+        };
+    
+        // --- DYNAMIC TABLE FUNCTIONS ---
+        const addZone = () => { numZones++; zonalTableBody.innerHTML += `<tr><td>${numZones}</td><td><input type="number" class="prod-input"></td><td><input type="number" class="attr-input"></td></tr>`; updateTravelTimeTable(); };
+        const removeZone = () => { if (numZones > 1) { zonalTableBody.lastChild.remove(); numZones--; updateTravelTimeTable(); } };
+        const updateTravelTimeTable = () => {
+            let table = `<table id="travelTimeTable"><thead><tr><th>Zone</th>${Array.from({length: numZones}, (_, i) => `<th>${i + 1}</th>`).join('')}</tr></thead><tbody>`;
+            for (let i = 0; i < numZones; i++) { table += `<tr><td>${i + 1}</td>${Array.from({length: numZones}, (_, j) => `<td><input type="number" data-row="${i}" data-col="${j}"></td>`).join('')}</tr>`; }
+            travelTimeContainer.innerHTML = table + `</tbody></table>`;
+        };
+        const addFrictionRow = (time = '', factor = '') => { frictionTableBody.innerHTML += `<tr><td><input type="number" value="${time}"></td><td><input type="number" value="${factor}"></td></tr>`; };
+    
+        // --- DATA GATHERING ---
+        const getZonalData = () => ({
+            productions: Array.from(document.querySelectorAll('.prod-input')).map(i => parseFloat(i.value) || 0),
+            attractions: Array.from(document.querySelectorAll('.attr-input')).map(i => parseFloat(i.value) || 0)
+        });
+        const getTravelTimes = () => Array.from({ length: numZones }, (_, i) => Array.from({ length: numZones }, (_, j) => parseFloat(document.querySelector(`#travelTimeTable input[data-row="${i}"][data-col="${j}"]`).value) || 0));
+        const getFrictionFactors = () => {
+            const factors = new Map();
+            frictionTableBody.querySelectorAll('tr').forEach(row => {
+                const inputs = row.querySelectorAll('input');
+                const time = parseInt(inputs[0].value), factor = parseFloat(inputs[1].value);
+                if (!isNaN(time) && !isNaN(factor)) factors.set(time, factor);
+            });
+            return factors;
+        };
+    
+        // --- CALCULATION LOGIC ---
+        const generateInitialTables = () => {
+            distributionStepsContainer.innerHTML = '';
+            const { productions, attractions } = getZonalData();
+            const totalP = productions.reduce((a, b) => a + b, 0);
+            const totalA = attractions.reduce((a, b) => a + b, 0);
+            
+            notificationEl.innerHTML = '';
+            if (Math.round(totalP) !== Math.round(totalA)) {
+                notificationEl.innerHTML = `<div class="notification notification-error">Productions (${totalP}) and Attractions (${totalA}) are not balanced.</div>`;
+                balanceBtn.style.display = 'inline-flex';
+            } else {
+                notificationEl.innerHTML = `<div class="notification notification-success">Productions (${totalP}) and Attractions (${totalA}) are balanced.</div>`;
+                balanceBtn.style.display = 'none';
+            }
+    
+            const travelTimes = getTravelTimes();
+            const frictionFactors = getFrictionFactors();
+            const frictionMatrix = travelTimes.map(row => row.map(time => getFrictionFactor(time, frictionFactors)));
+            const intermediateMatrix = Array.from({length: numZones}, (_, i) => Array.from({length: numZones}, (_, j) => attractions[j] * frictionMatrix[i][j]));
+            
+            renderMatrix('intermediateTableContainer', intermediateMatrix, 'A_j * F_ij');
+            
+            distributionStepsContainer.innerHTML += createDistributionStepHTML('singly', 'Iteration 1: Singly Constrained Distribution');
+            document.getElementById('calcSinglyBtn').addEventListener('click', calculateSinglyConstrainedDistribution);
+            resultsContainer.style.display = 'block';
+        };
+    
+        const balanceAttractions = () => {
+            const { productions, attractions } = getZonalData();
+            const totalP = productions.reduce((a, b) => a + b, 0);
+            const totalA = attractions.reduce((a, b) => a + b, 0);
+            if (totalA === 0) return alert("Total attractions cannot be zero.");
+            const factor = totalP / totalA;
+            const attrInputs = document.querySelectorAll('.attr-input');
+            let newTotalA = 0;
+            attrInputs.forEach((input, i) => {
+                const newVal = Math.round(attractions[i] * factor);
+                if (i === attrInputs.length - 1) { input.value = totalP - newTotalA; }
+                else { input.value = newVal; newTotalA += newVal; }
+            });
+            generateInitialTables();
+        };
+    
+        const calculateSinglyConstrainedDistribution = () => {
+            const { productions, attractions } = getZonalData();
+            const travelTimes = getTravelTimes();
+            const frictionFactors = getFrictionFactors();
+            const frictionMatrix = travelTimes.map(row => row.map(time => getFrictionFactor(time, frictionFactors)));
+    
+            currentTripTable = [];
+            const denominators = [];
+            for (let i = 0; i < numZones; i++) {
+                currentTripTable[i] = [];
+                const denominator = attractions.reduce((sum, Aj, j) => sum + (Aj * frictionMatrix[i][j]), 0);
+                denominators.push(denominator);
+                for (let j = 0; j < numZones; j++) {
+                    currentTripTable[i][j] = (denominator === 0) ? 0 : productions[i] * (attractions[j] * frictionMatrix[i][j]) / denominator;
+                }
+            }
+            
+            renderMatrix('singly-results', currentTripTable, 'T_ij');
+            showSinglyCalcDetails(productions, attractions, frictionMatrix, denominators);
+            document.getElementById('calcSinglyBtn').disabled = true;
+            
+            distributionStepsContainer.innerHTML += createDistributionStepHTML('adjust', 'Iteration 2: Adjust Attraction Values');
+            document.getElementById('calcAdjustBtn').addEventListener('click', calculateAdjustedAttractions);
+        };
+    
+        const calculateAdjustedAttractions = () => {
+            const { attractions } = getZonalData();
+            const computedAttractions = Array.from({ length: numZones }, (_, j) => currentTripTable.reduce((sum, row) => sum + row[j], 0));
+            
+            adjustedAttractions = attractions.map((targetA, j) => {
+                return computedAttractions[j] === 0 ? 0 : targetA * (targetA / computedAttractions[j]);
+            });
+    
+            showAdjustedAttractionCalcs(attractions, computedAttractions, adjustedAttractions);
+            document.getElementById('calcAdjustBtn').disabled = true;
+    
+            distributionStepsContainer.innerHTML += createDistributionStepHTML('doubly', 'Iteration 2: Doubly Constrained Distribution');
+            document.getElementById('calcDoublyBtn').addEventListener('click', calculateSecondIteration);
+        };
+        
+        const calculateSecondIteration = () => {
+            const { productions } = getZonalData();
+            const travelTimes = getTravelTimes();
+            const frictionFactors = getFrictionFactors();
+            const frictionMatrix = travelTimes.map(row => row.map(time => getFrictionFactor(time, frictionFactors)));
+    
+            let finalTripTable = [];
+            const denominators = [];
+            for (let i = 0; i < numZones; i++) {
+                finalTripTable[i] = [];
+                const denominator = adjustedAttractions.reduce((sum, adjA, j) => sum + (adjA * frictionMatrix[i][j]), 0);
+                denominators.push(denominator);
+                for (let j = 0; j < numZones; j++) {
+                    finalTripTable[i][j] = (denominator === 0) ? 0 : productions[i] * (adjustedAttractions[j] * frictionMatrix[i][j]) / denominator;
+                }
+            }
+            currentTripTable = finalTripTable;
+            renderMatrixWithComparison('doubly-results', finalTripTable);
+            showSecondIterationCalcDetails(productions, adjustedAttractions, frictionMatrix, denominators);
+            document.getElementById('calcDoublyBtn').disabled = true;
+        };
+        
+        // --- UTILITY & RENDERING ---
+        const getFrictionFactor = (time, factors) => {
+            if (factors.has(time)) return factors.get(time);
+            const sortedTimes = Array.from(factors.keys()).sort((a,b) => a-b);
+            if (time <= sortedTimes[0]) return factors.get(sortedTimes[0]);
+            if (time >= sortedTimes[sortedTimes.length - 1]) return factors.get(sortedTimes[sortedTimes.length - 1]);
+            let lowerT, upperT;
+            for(const t of sortedTimes) { if (t < time) lowerT = t; if (t > time) { upperT = t; break; } }
+            const lowerF = factors.get(lowerT), upperF = factors.get(upperT);
+            return lowerF + (upperF - lowerF) * (time - lowerT) / (upperT - lowerT);
+        };
+    
+        const createDistributionStepHTML = (id, title) => {
+            return `<div class="border-t pt-6">
+                        <div class="flex justify-between items-center">
+                            <h4>${title}</h4>
+                            <button id="calc${id.charAt(0).toUpperCase() + id.slice(1)}Btn" class="btn btn-secondary btn-sm">Calculate</button>
+                        </div>
+                        <div id="${id}-results" class="overflow-x-auto mt-4"></div>
+                        <div id="${id}-calcs"></div>
+                    </div>`;
+        };
+    
+        const showSinglyCalcDetails = (prods, attrs, fMatrix, denoms) => {
+            const calcDiv = document.getElementById('singly-calcs');
+            let html = `<div class="calculation-box"><span class="formula">T_ij = P_i * [A_j * F_ij] / &Sigma;(A_k * F_ik)</span>`;
+            for (let i = 0; i < numZones; i++) {
+                html += `<strong class="block mt-2">For Zone ${i + 1} (P = ${prods[i]}):</strong>`;
+                for (let j = 0; j < numZones; j++) {
+                    html += `T_${i + 1}-${j + 1} = ${prods[i]} * [${attrs[j]} * ${fMatrix[i][j].toFixed(1)}] / [${denoms[i].toFixed(0)}] = ${currentTripTable[i][j].toFixed(0)}<br>`;
+                }
+            }
+            calcDiv.innerHTML = html + '</div>';
+        };
+        
+        const showAdjustedAttractionCalcs = (targetAttrs, computedAttrs, adjustedAttrs) => {
+            const resultDiv = document.getElementById('adjust-results');
+            const calcDiv = document.getElementById('adjust-calcs');
+            
+            let tableHtml = `<table><thead><tr><th>Zone</th><th>Target A (A_j)</th><th>Computed A (C_j)</th><th>New A (A_j_new)</th></tr></thead><tbody>`;
+            for (let j = 0; j < numZones; j++) {
+                tableHtml += `<tr><td>${j + 1}</td><td>${targetAttrs[j]}</td><td>${computedAttrs[j].toFixed(2)}</td><td class="font-bold">${adjustedAttrs[j].toFixed(2)}</td></tr>`;
+            }
+            resultDiv.innerHTML = tableHtml + `</tbody></table>`;
+    
+            let html = `<div class="calculation-box"><span class="formula">A_j_new = A_j_target * (A_j_target / A_j_computed)</span>`;
+            for(let j=0; j < numZones; j++) {
+                html += `Zone ${j+1}: A_${j+1}_new = ${targetAttrs[j]} * (${targetAttrs[j]} / ${computedAttrs[j].toFixed(2)}) = ${adjustedAttrs[j].toFixed(2)}<br>`;
+            }
+            calcDiv.innerHTML = html + '</div>';
+        };
+        
+        const showSecondIterationCalcDetails = (prods, adjAttrs, fMatrix, denoms) => {
+            const calcDiv = document.getElementById('doubly-calcs');
+            let html = `<div class="calculation-box"><span class="formula">T_ij = P_i * [A_j_new * F_ij] / &Sigma;(A_k_new * F_ik)</span>`;
+            for (let i = 0; i < numZones; i++) {
+                 html += `<strong class="block mt-2">For Zone ${i + 1} (P = ${prods[i]}):</strong>`;
+                for (let j = 0; j < numZones; j++) {
+                    html += `T_${i + 1}-${j + 1} = ${prods[i]} * [${adjAttrs[j].toFixed(1)} * ${fMatrix[i][j].toFixed(1)}] / [${denoms[i].toFixed(0)}] = ${currentTripTable[i][j].toFixed(0)}<br>`;
+                }
+            }
+            calcDiv.innerHTML = html + '</div>';
+        };
+    
+        const renderMatrix = (containerId, matrix, title) => {
+            const container = document.getElementById(containerId);
+            let table = `<table><thead><tr><th>${title}</th>${Array.from({length: numZones}, (_, i) => `<th>${i + 1}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+            matrix.forEach((row, i) => {
+                table += `<tr><td>${i + 1}</td>`;
+                row.forEach((val) => { table += `<td>${val.toFixed(0)}</td>`; });
+                table += `<td class="font-bold">${row.reduce((s, v) => s + v, 0).toFixed(0)}</td></tr>`;
+            });
+            table += `<tr class="font-bold bg-gray-50"><td>Total</td>`;
+            let grandTotal = 0;
+            for (let j = 0; j < numZones; j++) {
+                const colSum = matrix.reduce((s, r) => s + r[j], 0); grandTotal += colSum;
+                table += `<td>${colSum.toFixed(0)}</td>`;
+            }
+            table += `<td>${grandTotal.toFixed(0)}</td></tr></tbody></table>`;
+            container.innerHTML = table;
+        };
+        
+        const renderMatrixWithComparison = (containerId, matrix) => {
+            const { productions, attractions } = getZonalData();
+            const container = document.getElementById(containerId);
+            let table = `<table><thead><tr><th>Zone</th>${Array.from({length: numZones}, (_, i) => `<th>${i + 1}</th>`).join('')}<th>Computed P</th><th>Given P</th></tr></thead><tbody>`;
+            matrix.forEach((row, i) => {
+                table += `<tr><td>${i + 1}</td>`;
+                row.forEach((val) => { table += `<td>${val.toFixed(0)}</td>`; });
+                const computedP = row.reduce((s, v) => s + v, 0);
+                table += `<td class="font-semibold">${computedP.toFixed(0)}</td><td class="bg-gray-50">${productions[i]}</td></tr>`;
+            });
+            // Computed A row
+            table += `<tr class="font-semibold"><td class="bg-gray-50">Computed A</td>`;
+            for (let j = 0; j < numZones; j++) {
+                const colSum = matrix.reduce((s, r) => s + r[j], 0);
+                table += `<td>${colSum.toFixed(0)}</td>`;
+            }
+            table += `<td class="bg-gray-100">${productions.reduce((s,v)=>s+v,0)}</td><td class="bg-gray-100">${attractions.reduce((s,v)=>s+v,0)}</td></tr>`;
+            // Given A row
+            table += `<tr class="bg-gray-50"><td class="font-semibold">Given A</td>`;
+            attractions.forEach(a => table += `<td>${a}</td>`);
+            table += `<td class="bg-gray-100"></td><td class="bg-gray-100"></td></tr>`;
+    
+            table += `</tbody></table>`;
+            container.innerHTML = table;
+        };
+        
+        // --- EVENT LISTENERS ---
+        document.getElementById('addZoneBtn').addEventListener('click', addZone);
+        document.getElementById('removeZoneBtn').addEventListener('click', removeZone);
+        document.getElementById('addFrictionRowBtn').addEventListener('click', () => addFrictionRow());
+        document.getElementById('generateInitialBtn').addEventListener('click', generateInitialTables);
+        balanceBtn.addEventListener('click', balanceAttractions);
+    
+        // --- RUN ---
+        init();
+    });
+</script>
+
+</body>
+</html>

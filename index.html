@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Step Transportation Planning Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* A light gray background */
+        }
+        .step-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .step-card h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .step-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: center;
+            padding: 0.75rem;
+            border: 1px solid #e5e7eb;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #4b5563;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn:disabled {
+            background-color: #d1d5db;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; }
+        .btn-secondary:hover { background-color: #d1d5db; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        
+        /* Tab Styles */
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 3px solid transparent;
+            text-decoration: none;
+        }
+        .tab-button.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+        .tab-button.disabled {
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        /* Collapsible Section Styles */
+        details summary {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1f2937;
+            cursor: pointer;
+            padding: 1rem;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::after {
+            content: '▶';
+            transition: transform 0.2s;
+        }
+        details[open] summary::after {
+            transform: rotate(90deg);
+        }
+        details[open] .collapsible-content {
+            border-left: 3px solid #4f46e5;
+            padding-left: 1.5rem;
+            margin-top: 1rem;
+        }
+
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">The 4-Step Transportation Planning Model</h1>
+            <p class="text-lg text-gray-600 mt-2">An interactive tool for understanding travel demand forecasting.</p>
+        </header>
+
+        <div class="border-b border-gray-200 mb-6">
+            <nav class="flex flex-wrap -mb-px justify-center bg-white rounded-t-lg p-2 shadow-sm">
+                <a href="index.html" class="tab-button active">Part A: Trip Generation</a>
+                <a href="partb.html" class="tab-button">Part B: Trip Distribution</a>
+                <a href="partc.html" class="tab-button">Part C: Mode Choice</a>
+                <a href="partd.html" class="tab-button">Part D: Trip Assignment</a>
+            </nav>
+        </div>
+
+        <div id="partA">
+            
+            <details>
+                <summary>1. Modeling with Cross-Categorization</summary>
+                <div class="collapsible-content">
+                    <div class="step-card">
+                        <h2><span class="text-indigo-600">Step 0:</span> Travel Survey Data Input</h2>
+                        <p class="text-gray-600 mb-4">Enter household survey data to build the trip generation model. Default values are provided.</p>
+                        <div class="overflow-x-auto">
+                            <table id="surveyTable">
+                                <thead>
+                                    <tr>
+                                        <th>HH Number</th>
+                                        <th>Trips per HH</th>
+                                        <th>Income ($1000s)</th>
+                                        <th>Autos per HH</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="flex flex-wrap gap-4 mt-6 justify-center">
+                            <button id="calculateBtn" class="btn btn-primary">Calculate Model</button>
+                            <button id="addRowBtn" class="btn btn-secondary">Add Row</button>
+                            <button id="clearAllBtn" class="btn btn-danger">Clear All</button>
+                        </div>
+                    </div>
+                    <div id="modelBuildingResults" style="display: none;">
+                        <div class="step-card">
+                            <h2><span class="text-indigo-600">Step 1:</span> Auto Ownership Model</h2>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                                <div>
+                                    <h3>Household Cross-Classification</h3>
+                                    <table id="ownershipTable"></table>
+                                </div>
+                                <div>
+                                    <h3>Ownership vs. Income</h3>
+                                    <canvas id="ownershipChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="step-card">
+                            <h2><span class="text-indigo-600">Step 2:</span> Trip Rate Model</h2>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                                <div>
+                                    <h3>Average Trips per Household</h3>
+                                    <table id="tripRateTable"></table>
+                                </div>
+                                <div>
+                                    <h3>Trip Rate vs. Income & Ownership</h3>
+                                    <canvas id="tripRateChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>2. Applying the Model (Trip Production)</summary>
+                <div class="collapsible-content">
+                    <div class="step-card">
+                        <div class="flex justify-between items-center border-b-2 border-gray-200 pb-4">
+                            <h2 class="text-xl font-bold text-gray-800 m-0 p-0 border-none"><span class="text-indigo-600">Input:</span> Zonal Data & Model Parameters</h2>
+                            <button id="importModelBtn" class="btn btn-secondary" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                Import Calculated Model
+                            </button>
+                        </div>
+                         <p class="text-gray-600 my-6">Enter characteristics for the zone you want to analyze, along with the model parameters. You can manually enter parameters or import them from the modeling step above.</p>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label for="dwellingUnits" class="font-semibold text-gray-700">Total Dwelling Units (Households)</label>
+                                <input type="number" id="dwellingUnits" class="mt-1" value="60">
+                            </div>
+                             <div>
+                                <label for="avgIncome" class="font-semibold text-gray-700">Average Zonal Income ($)</label>
+                                <input type="number" id="avgIncome" class="mt-1" value="44000">
+                            </div>
+                        </div>
+                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div><h3>Step 1: Income Distribution</h3><table id="incomeDistTable"></table></div>
+                            <div><h3>Step 2: Auto Ownership Dist. (%)</h3><table id="autoDistTable"></table></div>
+                            <div><h3>Step 3: Trip Rates</h3><table id="appTripRateTable"></table></div>
+                         </div>
+                         <div class="flex justify-center mt-8"><button id="calculateGenerationBtn" class="btn btn-primary">Calculate Produced Trips</button></div>
+                    </div>
+                    <div id="tripGenerationResults" class="step-card" style="display: none;">
+                        <h2><span class="text-indigo-600">Step 4:</span> Trip Production Results</h2>
+                        <p class="text-gray-600 mb-4">The table below breaks down the total trip calculation. Each row is calculated as: <br> <code class="bg-gray-100 p-1 rounded">Total HHs × % Income Group × % Auto Group × Trip Rate</code></p>
+                        <table id="finalCalcTable"></table>
+                        <div class="text-center mt-6"><h3 class="text-2xl font-bold text-gray-800">Total Produced Trips: <span id="totalTrips" class="text-indigo-600">0</span></h3></div>
+                    </div>
+                </div>
+            </details>
+            
+            <details>
+                <summary>3. Trip Attraction Calculation</summary>
+                <div class="collapsible-content">
+                    <div class="step-card">
+                        <h2><span class="text-indigo-600">Input:</span> Zonal Employment & Attraction Rates</h2>
+                        <p class="text-gray-600 mb-6">Calculate trips attracted to a zone based on its land use, like employment numbers. Edit the values below to match your scenario.</p>
+                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div>
+                                <h3>Zonal Employment</h3>
+                                <table id="employmentTable"></table>
+                                <h3>Attraction Rates (per unit/day)</h3>
+                                <div class="overflow-x-auto">
+                                    <table id="attractionRateTable"></table>
+                                </div>
+                            </div>
+                            <div id="tripAttractionResults" style="display:none;">
+                                <h3>Calculation Results</h3>
+                                <table id="attractionCalcTable"></table>
+                                <div class="text-center mt-6">
+                                    <h3 class="text-2xl font-bold text-gray-800">Total Attracted Trips: <span id="totalAttractedTrips" class="text-indigo-600">0</span></h3>
+                                </div>
+                            </div>
+                         </div>
+                         <div class="flex justify-center mt-8"><button id="calculateAttractionBtn" class="btn btn-primary">Calculate Attracted Trips</button></div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>4. Trip Balancing</summary>
+                 <div class="collapsible-content">
+                    <div class="step-card">
+                        <h2><span class="text-indigo-600">Input:</span> Unbalanced Zonal Productions & Attractions</h2>
+                         <p class="text-gray-600 mb-6">Enter the total trip productions and attractions for each zone. The tool will adjust the attractions to match the total productions, as productions are typically considered more accurate.</p>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div>
+                                <h3>Unbalanced Trips</h3>
+                                <table id="balancingInputTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Zone</th>
+                                            <th>Productions</th>
+                                            <th>Attractions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                                <div class="flex justify-center gap-4 mt-4">
+                                    <button id="addZoneBtn" class="btn btn-secondary">Add Zone</button>
+                                    <button id="calculateBalancingBtn" class="btn btn-primary">Balance Trips</button>
+                                </div>
+                            </div>
+                             <div id="balancingResults" style="display:none;">
+                                <h3>Balancing Factor</h3>
+                                <p class="text-center text-gray-700 mb-4 bg-gray-50 p-3 rounded-lg">
+                                    Factor = Total Productions / Total Attractions = <span id="balancingFactor" class="font-bold text-indigo-600">0</span>
+                                </p>
+                                <h3>Balanced Trips</h3>
+                                <table id="balancedTable"></table>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </details>
+        </div>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- GLOBAL SETUP ---
+            let ownershipChartInstance = null;
+            let tripRateChartInstance = null;
+            let calculatedAutoDist = null;
+            let calculatedTripRates = null;
+    
+            // --- UNIFIED CATEGORIES ---
+            const incomeCategories = { 'Low (<$32k)': (i) => i <= 32, 'Medium ($32-48k)': (i) => i > 32 && i <= 48, 'High (>$48k)': (i) => i > 48 };
+            const autoCategories = { '0 Autos': (a) => a === 0, '1 Auto': (a) => a === 1, '2+ Autos': (a) => a >= 2 };
+    
+            // --- MODEL BUILDING ---
+            const defaultSurveyData = [
+                { hh: 1, trips: 2, income: 16, autos: 0 }, { hh: 2, trips: 4, income: 24, autos: 0 }, { hh: 3, trips: 10, income: 68, autos: 2 },
+                { hh: 4, trips: 5, income: 44, autos: 0 }, { hh: 5, trips: 5, income: 18, autos: 1 }, { hh: 6, trips: 15, income: 68, autos: 3 },
+                { hh: 7, trips: 7, income: 38, autos: 1 }, { hh: 8, trips: 4, income: 36, autos: 0 }, { hh: 9, trips: 6, income: 28, autos: 1 },
+                { hh: 10, trips: 13, income: 76, autos: 3 }, { hh: 11, trips: 8, income: 72, autos: 1 }, { hh: 12, trips: 6, income: 32, autos: 1 },
+                { hh: 13, trips: 9, income: 28, autos: 2 }, { hh: 14, trips: 11, income: 44, autos: 2 }, { hh: 15, trips: 10, income: 52, autos: 2 },
+                { hh: 16, trips: 11, income: 52, autos: 2 }, { hh: 17, trips: 12, income: 60, autos: 2 }, { hh: 18, trips: 8, income: 44, autos: 1 },
+                { hh: 19, trips: 8, income: 52, autos: 1 }, { hh: 20, trips: 6, income: 28, autos: 1 },
+            ];
+            const surveyTableBody = document.querySelector('#surveyTable tbody');
+            const modelBuildingResults = document.getElementById('modelBuildingResults');
+    
+            const populateSurveyTable = (data) => { surveyTableBody.innerHTML = ''; data.forEach(item => addSurveyTableRow(item.hh, item.trips, item.income, item.autos)); };
+            const addSurveyTableRow = (hh = '', trips = '', income = '', autos = '') => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td><input type="number" class="hh" value="${hh}" readonly></td><td><input type="number" class="trips" value="${trips}" min="0"></td><td><input type="number" class="income" value="${income}" min="0"></td><td><input type="number" class="autos" value="${autos}" min="0"></td>`;
+                surveyTableBody.appendChild(row);
+                updateHouseholdNumbers();
+            };
+            const updateHouseholdNumbers = () => surveyTableBody.querySelectorAll('.hh').forEach((input, index) => input.value = index + 1);
+            const calculateAndBuildModel = () => {
+                const data = parseTableData(surveyTableBody, ['.trips', '.income', '.autos']);
+                if (data.length === 0) { alert("Please enter survey data."); return; }
+                modelBuildingResults.style.display = 'block';
+                const ownershipData = calculateOwnership(data);
+                const tripRateData = calculateTripRates(data);
+                const incomeKeys = Object.keys(incomeCategories), autoKeys = Object.keys(autoCategories);
+                calculatedAutoDist = incomeKeys.map(incKey => {
+                    const total = Object.values(ownershipData[incKey]).reduce((s, v) => s + v, 0);
+                    return autoKeys.map(autoKey => total > 0 ? parseFloat(((ownershipData[incKey][autoKey] / total) * 100).toFixed(0)) : 0);
+                });
+                calculatedTripRates = incomeKeys.map(incKey => autoKeys.map(autoKey => {
+                    const cell = tripRateData[incKey][autoKey];
+                    return cell.count > 0 ? parseFloat((cell.sum / cell.count).toFixed(1)) : 0;
+                }));
+                renderOwnershipTable(ownershipData); renderOwnershipChart(ownershipData);
+                renderTripRateTable(tripRateData); renderTripRateChart(tripRateData);
+                document.getElementById('importModelBtn').disabled = false;
+                modelBuildingResults.scrollIntoView({ behavior: 'smooth' });
+            };
+            const calculateOwnership = (data) => {
+                const incomeKeys = Object.keys(incomeCategories), autoKeys = Object.keys(autoCategories);
+                const results = incomeKeys.reduce((acc, incKey) => ({...acc, [incKey]: autoKeys.reduce((subAcc, autoKey) => ({...subAcc, [autoKey]: 0 }), {}) }), {});
+                data.forEach(hh => {
+                    const incKey = incomeKeys.find(key => incomeCategories[key](hh.income));
+                    const autoKey = autoKeys.find(key => autoCategories[key](hh.autos));
+                    if (incKey && autoKey) results[incKey][autoKey]++;
+                });
+                return results;
+            };
+            const renderOwnershipTable = (data) => {
+                const table = document.getElementById('ownershipTable');
+                let html = `<thead><tr><th>Income</th>`; Object.keys(autoCategories).forEach(h => html += `<th>${h}</th>`); html += `<th>Total</th></tr></thead><tbody>`;
+                Object.keys(incomeCategories).forEach(incKey => {
+                    const total = Object.values(data[incKey]).reduce((s, v) => s + v, 0);
+                    html += `<tr><td>${incKey}</td>`;
+                    Object.keys(autoCategories).forEach(autoKey => { const count = data[incKey][autoKey], perc = total > 0 ? ((count / total) * 100).toFixed(0) : 0; html += `<td>${count} (${perc}%)</td>`; });
+                    html += `<td>${total}</td></tr>`;
+                });
+                table.innerHTML = html + `</tbody>`;
+            };
+            const calculateTripRates = (data) => {
+                const incomeKeys = Object.keys(incomeCategories), autoKeys = Object.keys(autoCategories);
+                const results = incomeKeys.reduce((acc, incKey) => ({...acc, [incKey]: autoKeys.reduce((subAcc, autoKey) => ({...subAcc, [autoKey]: { sum: 0, count: 0 } }), {}) }), {});
+                data.forEach(hh => {
+                    const incKey = incomeKeys.find(key => incomeCategories[key](hh.income));
+                    const autoKey = autoKeys.find(key => autoCategories[key](hh.autos));
+                    if (incKey && autoKey) { results[incKey][autoKey].sum += hh.trips; results[incKey][autoKey].count++; }
+                });
+                return results;
+            };
+            const renderTripRateTable = (data) => {
+                const table = document.getElementById('tripRateTable');
+                let html = `<thead><tr><th>Income</th>`; Object.keys(autoCategories).forEach(h => html += `<th>${h}</th>`); html += `</tr></thead><tbody>`;
+                Object.keys(incomeCategories).forEach(incKey => {
+                    html += `<tr><td>${incKey}</td>`;
+                    Object.keys(autoCategories).forEach(autoKey => { const cell = data[incKey][autoKey], avg = cell.count > 0 ? (cell.sum / cell.count).toFixed(1) : '—'; html += `<td>${avg}</td>`; });
+                    html += `</tr>`;
+                });
+                table.innerHTML = html + `</tbody>`;
+            };
+            const renderOwnershipChart = (data) => {
+                if (ownershipChartInstance) ownershipChartInstance.destroy();
+                const ctx = document.getElementById('ownershipChart').getContext('2d');
+                ownershipChartInstance = new Chart(ctx, createChartConfig('Household Auto Ownership by Income', 'Households (%)', Object.keys(incomeCategories), Object.keys(autoCategories).map((autoKey, i) => ({ label: `${autoKey}`, data: Object.keys(incomeCategories).map(incKey => { const total = Object.values(data[incKey]).reduce((s, v) => s + v, 0); return total > 0 ? (data[incKey][autoKey] / total) * 100 : 0; }), borderColor: ['#6366f1', '#f97316', '#10b981'][i], }))));
+            };
+            const renderTripRateChart = (data) => {
+                if (tripRateChartInstance) tripRateChartInstance.destroy();
+                const ctx = document.getElementById('tripRateChart').getContext('2d');
+                tripRateChartInstance = new Chart(ctx, createChartConfig('Average Trips by Income and Auto Ownership', 'Number of Trips / Household', Object.keys(incomeCategories), Object.keys(autoCategories).map((autoKey, i) => ({ label: `${autoKey}`, data: Object.keys(incomeCategories).map(incKey => { const cell = data[incKey][autoKey]; return cell.count > 0 ? (cell.sum / cell.count) : null; }), borderColor: ['#6366f1', '#f97316', '#10b981'][i], }))));
+            };
+    
+            // --- MODEL APPLICATION (PRODUCTION) ---
+            const initApplicationTables = () => {
+                createInputTable('incomeDistTable', Object.keys(incomeCategories), ['Income', 'Households (%)'], [9, 40, 51], '%');
+                createInputTableMatrix('autoDistTable', Object.keys(incomeCategories), Object.keys(autoCategories), [[54, 42, 4], [4, 58, 38], [2, 30, 68]]);
+                createInputTableMatrix('appTripRateTable', Object.keys(incomeCategories), Object.keys(autoCategories), [[1, 6, 7], [2, 8, 13], [3, 11, 15]]);
+            };
+            const calculateGeneratedTrips = () => {
+                const dwellings = parseFloat(document.getElementById('dwellingUnits').value) || 0;
+                const incomeDist = getTableValues('incomeDistTable').map(v => v / 100);
+                const autoDist = getTableValues('autoDistTable', true).map(row => row.map(v => v / 100));
+                const tripRates = getTableValues('appTripRateTable', true);
+                let totalTrips = 0;
+                let resultsHtml = `<thead><tr><th>Income</th><th>Autos</th><th>Calculation</th><th>Trips</th></tr></thead><tbody>`;
+                Object.keys(incomeCategories).forEach((incGroup, r) => Object.keys(autoCategories).forEach((autoGroup, c) => {
+                    const trips = dwellings * incomeDist[r] * autoDist[r][c] * tripRates[r][c];
+                    totalTrips += trips;
+                    resultsHtml += `<tr><td class="text-sm">${incGroup}</td><td class="text-sm">${autoGroup}</td><td class="text-xs text-gray-500">${dwellings}×${incomeDist[r].toFixed(2)}×${autoDist[r][c].toFixed(2)}×${tripRates[r][c]}</td><td class="font-semibold">${trips.toFixed(0)}</td></tr>`;
+                }));
+                document.getElementById('finalCalcTable').innerHTML = resultsHtml + `</tbody>`;
+                document.getElementById('totalTrips').textContent = totalTrips.toFixed(0);
+                const resultsContainer = document.getElementById('tripGenerationResults');
+                resultsContainer.style.display = 'block';
+                resultsContainer.scrollIntoView({ behavior: 'smooth' });
+            };
+            const importCalculatedModel = () => {
+                if (!calculatedAutoDist || !calculatedTripRates) { alert("Please calculate a model first."); return; }
+                document.querySelectorAll('#autoDistTable .input-cell').forEach(i => i.value = calculatedAutoDist[i.dataset.row][i.dataset.col]);
+                document.querySelectorAll('#appTripRateTable .input-cell').forEach(i => i.value = calculatedTripRates[i.dataset.row][i.dataset.col]);
+                const btn = document.getElementById('importModelBtn');
+                btn.innerHTML = `Model Imported!`; btn.classList.replace('btn-secondary', 'btn-primary');
+                setTimeout(() => { btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg> Import Calculated Model`; btn.classList.replace('btn-primary', 'btn-secondary'); }, 2000);
+            };
+    
+            // --- TRIP ATTRACTION ---
+            const attractionUnits = ['Downtown Retail Emp.', 'Non-retail Emp.', 'Household'];
+            const tripPurposes = ['HBW', 'HBO', 'NHB'];
+            const initAttractionModule = () => {
+                const empTable = document.getElementById('employmentTable');
+                let empHtml = `<thead><tr><th>Employment Type</th><th>Number</th></tr></thead><tbody>`;
+                attractionUnits.forEach((unit, i) => { if (unit !== 'Household') empHtml += `<tr><td>${unit}</td><td><input type="number" class="emp-input" value="${[220, 650, 0][i]}" data-index="${i}"></td></tr>`; });
+                empTable.innerHTML = empHtml + '</tbody>';
+                const rateTable = document.getElementById('attractionRateTable');
+                let rateHtml = `<thead><tr><th>Purpose</th>`; attractionUnits.forEach(h => rateHtml += `<th>${h}</th>`); rateHtml += `</tr></thead><tbody>`;
+                tripPurposes.forEach((purpose, r) => {
+                    rateHtml += `<tr><td>${purpose}</td>`;
+                    attractionUnits.forEach((_, c) => {
+                        let value = 0;
+                        if (purpose === 'HBW') value = c < 2 ? 1.7 : 0;
+                        if (purpose === 'HBO') value = [5.0, 2.0, 1.0][c];
+                        if (purpose === 'NHB') value = [3.0, 1.0, 1.0][c];
+                        rateHtml += `<td><input type="number" step="0.1" class="rate-input" value="${value}" data-row="${r}" data-col="${c}"></td>`;
+                    });
+                    rateHtml += `</tr>`;
+                });
+                rateTable.innerHTML = rateHtml + '</tbody>';
+            };
+            const calculateAttractedTrips = () => {
+                const employment = Array(attractionUnits.length).fill(0);
+                document.querySelectorAll('#employmentTable .emp-input').forEach(i => employment[i.dataset.index] = parseFloat(i.value) || 0);
+                const rates = [];
+                document.querySelectorAll('#attractionRateTable .rate-input').forEach(i => { const r = i.dataset.row, c = i.dataset.col; if (!rates[r]) rates[r] = []; rates[r][c] = parseFloat(i.value) || 0; });
+                let totalAttracted = 0;
+                let resultsHtml = `<thead><tr><th>Purpose</th><th>Calculation</th><th>Trips</th></tr></thead><tbody>`;
+                tripPurposes.forEach((purpose, r) => {
+                    let purposeTotal = 0;
+                    let calcString = [];
+                    attractionUnits.forEach((unit, c) => { if (employment[c] > 0) { const componentTrips = employment[c] * rates[r][c]; purposeTotal += componentTrips; calcString.push(`(${employment[c]} × ${rates[r][c]})`); } });
+                    totalAttracted += purposeTotal;
+                    resultsHtml += `<tr><td>${purpose}</td><td class="text-xs text-gray-500">${calcString.join(' + ')}</td><td class="font-semibold">${purposeTotal.toFixed(0)}</td></tr>`;
+                });
+                document.getElementById('attractionCalcTable').innerHTML = resultsHtml + '</tbody>';
+                document.getElementById('totalAttractedTrips').textContent = totalAttracted.toFixed(0);
+                document.getElementById('tripAttractionResults').style.display = 'block';
+            };
+    
+            // --- TRIP BALANCING ---
+            const balancingTableBody = document.querySelector('#balancingInputTable tbody');
+            const initBalancingModule = () => {
+                const defaultData = [{prod: 100, attr: 240}, {prod: 200, attr: 400}, {prod: 300, attr: 160}];
+                balancingTableBody.innerHTML = '';
+                defaultData.forEach(d => addBalancingZoneRow(d.prod, d.attr));
+            };
+            const addBalancingZoneRow = (prod = '', attr = '') => {
+                const row = document.createElement('tr');
+                const zoneNum = balancingTableBody.rows.length + 1;
+                row.innerHTML = `<td>Zone ${zoneNum}</td><td><input type="number" class="balancing-prod" value="${prod}"></td><td><input type="number" class="balancing-attr" value="${attr}"></td>`;
+                balancingTableBody.appendChild(row);
+            };
+            const calculateBalancing = () => {
+                const rows = balancingTableBody.querySelectorAll('tr');
+                if (rows.length === 0) { alert("Please add at least one zone."); return; }
+                const data = Array.from(rows).map(row => ({
+                    prod: parseFloat(row.querySelector('.balancing-prod').value) || 0,
+                    attr: parseFloat(row.querySelector('.balancing-attr').value) || 0
+                }));
+    
+                const totalProd = data.reduce((sum, row) => sum + row.prod, 0);
+                const totalAttr = data.reduce((sum, row) => sum + row.attr, 0);
+                if (totalAttr === 0) { alert("Total attractions cannot be zero."); return; }
+    
+                const factor = totalProd / totalAttr;
+                document.getElementById('balancingFactor').textContent = `${totalProd} / ${totalAttr} = ${factor.toFixed(3)}`;
+                
+                const balancedTable = document.getElementById('balancedTable');
+                let resultsHtml = `<thead><tr><th>Zone</th><th>Productions</th><th>Balanced Attractions</th></tr></thead><tbody>`;
+                let balancedTotalAttr = 0;
+                data.forEach((row, i) => {
+                    const balancedAttr = row.attr * factor;
+                    balancedTotalAttr += balancedAttr;
+                    resultsHtml += `<tr><td>Zone ${i + 1}</td><td>${row.prod}</td><td>${balancedAttr.toFixed(0)}</td></tr>`;
+                });
+                 resultsHtml += `<tr class="font-bold bg-gray-50"><td>Total</td><td>${totalProd}</td><td>${balancedTotalAttr.toFixed(0)}</td></tr>`;
+                balancedTable.innerHTML = resultsHtml + '</tbody>';
+                document.getElementById('balancingResults').style.display = 'block';
+            };
+    
+            // --- UTILITY & SHARED FUNCTIONS ---
+            const createChartConfig = (title, yLabel, labels, datasets) => {
+                datasets.forEach(ds => { ds.backgroundColor = ds.borderColor + '33'; ds.fill = false; ds.tension = 0.4; });
+                return { type: 'line', data: { labels, datasets }, options: { responsive: true, plugins: { title: { display: true, text: title }, legend: { position: 'top' } }, scales: { y: { beginAtZero: true, title: { display: true, text: yLabel } }, x: { title: { display: true, text: 'Income Category' } } } } };
+            };
+            const parseTableData = (tableBody, selectors) => {
+                const data = [];
+                tableBody.querySelectorAll('tr').forEach(row => { const [trips, income, autos] = selectors.map(s => parseInt(row.querySelector(s).value)); if (![trips, income, autos].some(isNaN)) data.push({ trips, income, autos }); });
+                return data;
+            };
+            const getTableValues = (tableId, isMatrix = false) => {
+                const inputs = document.querySelectorAll(`#${tableId} .input-cell`);
+                if (!isMatrix) return Array.from(inputs).map(i => parseFloat(i.value) || 0);
+                const values = [];
+                inputs.forEach(i => { const r = i.dataset.row, c = i.dataset.col; if (!values[r]) values[r] = []; values[r][c] = parseFloat(i.value) || 0; });
+                return values;
+            };
+            const createInputTable = (tableId, rowHeaders, colHeaders, defaultValues, suffix = '') => {
+                const table = document.getElementById(tableId);
+                let html = `<thead><tr><th>${colHeaders[0]}</th><th>${colHeaders[1]}</th></tr></thead><tbody>`;
+                rowHeaders.forEach((header, r) => { html += `<tr><td>${header}</td><td><input type="number" value="${defaultValues[r]}" class="input-cell" data-row="${r}"> ${suffix}</td></tr>`; });
+                table.innerHTML = html + `</tbody>`;
+            };
+            const createInputTableMatrix = (tableId, rowHeaders, colHeaders, defaultValues) => {
+                const table = document.getElementById(tableId);
+                let html = `<thead><tr><th>Income</th>`;
+                colHeaders.forEach(h => html += `<th>${h}</th>`);
+                html += `</tr></thead><tbody>`;
+                rowHeaders.forEach((header, r) => { html += `<tr><td>${header}</td>`; colHeaders.forEach((_, c) => { html += `<td><input type="number" value="${defaultValues[r][c]}" class="input-cell" data-row="${r}" data-col="${c}"></td>`; }); html += `</tr>`; });
+                table.innerHTML = html + `</tbody>`;
+            };
+            
+            // --- EVENT LISTENERS ---
+            document.getElementById('addRowBtn').addEventListener('click', () => addSurveyTableRow());
+            document.getElementById('clearAllBtn').addEventListener('click', () => surveyTableBody.innerHTML = '');
+            document.getElementById('calculateBtn').addEventListener('click', calculateAndBuildModel);
+            document.getElementById('calculateGenerationBtn').addEventListener('click', calculateGeneratedTrips);
+            document.getElementById('importModelBtn').addEventListener('click', importCalculatedModel);
+            document.getElementById('calculateAttractionBtn').addEventListener('click', calculateAttractedTrips);
+            document.getElementById('addZoneBtn').addEventListener('click', () => addBalancingZoneRow());
+            document.getElementById('calculateBalancingBtn').addEventListener('click', calculateBalancing);
+    
+            // --- INITIALIZATION ---
+            populateSurveyTable(defaultSurveyData);
+            initApplicationTables();
+            initAttractionModule();
+            initBalancingModule();
+        });
+    </script>
+</body>
+</html>

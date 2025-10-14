@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part D: Trip Assignment - 4-Step Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: white; border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .card h2 { font-size: 1.5rem; font-weight: 700; color: #111827; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease-in-out; border: none; }
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
+        .btn-primary { background-color: #4f46e5; color: white; } .btn-primary:hover { background-color: #4338ca; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; } .btn-secondary:hover { background-color: #d1d5db; }
+        .btn-danger { background-color: #ef4444; color: white; } .btn-danger:hover { background-color: #dc2626; }
+        .btn-success { background-color: #22c55e; color: white; } .btn-success:hover { background-color: #16a34a; }
+        
+        /* Graph Styles */
+        .graph-container { border: 1px solid #d1d5db; border-radius: 0.5rem; background-color: #f9fafb; }
+        .graph-container.add-mode { cursor: crosshair; }
+        .graph-container.delete-mode, .graph-container.delete-mode g { cursor: not-allowed; }
+        .links line { stroke: #999; stroke-opacity: 0.6; transition: stroke-width 0.3s; }
+        .nodes g:hover > circle { stroke: #fbbf24; stroke-width: 3px; }
+        .nodes circle { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+        .nodes circle.selected { stroke: #fbbf24; stroke-width: 4px; }
+        .node-label { font-size: 12px; pointer-events: none; text-anchor: middle; fill: white; }
+        .link-label { font-size: 12px; fill: #4b5563; font-weight: bold; cursor: pointer; }
+        .volume-label { font-size: 11px; fill: #c2410c; font-weight: bold; pointer-events: none; }
+        .calculation-table th, .od-table th { font-size: 0.8rem; padding: 0.5rem; }
+        .calculation-table td, .od-table td { font-size: 0.8rem; padding: 0.5rem; font-family: monospace; }
+        .od-table input { width: 60px; text-align: center; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">The 4-Step Transportation Planning Model</h1>
+            <p class="text-lg text-gray-600 mt-2">Part D: Trip Assignment (Shortest Path)</p>
+        </header>
+
+        <nav class="bg-white rounded-lg shadow-sm mb-8 p-2 flex justify-center">
+             <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part A: Trip Generation</a>
+             <a href="partb.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part B: Trip Distribution</a>
+             <a href="partc.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part C: Mode Choice</a>
+             <a href="#" class="px-4 py-2 text-indigo-600 font-bold border-b-2 border-indigo-600">Part D: Trip Assignment</a>
+        </nav>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <div class="card">
+                    <h2>Controls & Instructions</h2>
+                    <ul class="list-disc list-inside space-y-2 text-gray-600">
+                        <li><strong>Add/Delete:</strong> Activate a mode, then click an item or the canvas.</li>
+                        <li><strong>Edit Name/Time:</strong> Double-click a node or link label.</li>
+                        <li><strong>Add Edge:</strong> Click one node (it turns yellow), then another.</li>
+                    </ul>
+                    <div class="grid grid-cols-2 gap-3 mt-6">
+                        <button id="addNodeBtn" class="btn btn-secondary">Add Node</button>
+                        <button id="deleteBtn" class="btn btn-secondary">Delete Mode</button>
+                        <button id="randomizeNetBtn" class="btn btn-secondary col-span-2">Randomize Network</button>
+                        <button id="clearBtn" class="btn btn-danger col-span-2">Clear All</button>
+                        <button id="calculateBtn" class="btn btn-primary col-span-2">1. Calculate Shortest Paths</button>
+                    </div>
+                </div>
+                <div id="od-card" class="card" style="display: none;">
+                    <div class="flex justify-between items-center">
+                        <h2>O-D Matrix</h2>
+                        <button id="randomizeODBtn" class="btn btn-secondary btn-sm">Randomize</button>
+                    </div>
+                    <div id="od-matrix-container" class="overflow-x-auto"></div>
+                    <button id="assignBtn" class="btn btn-primary w-full mt-4" disabled>2. Calculate Trip Assignment</button>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div class="card">
+                    <h2>Network Graph</h2>
+                    <div id="graph-container" class="graph-container w-full aspect-video"></div>
+                </div>
+                <div id="results-card" class="card" style="display: none;">
+                    <h2>Shortest Path Results</h2>
+                    <div id="results-table-container" class="overflow-x-auto"></div>
+                    <div id="dijkstra-steps-container" class="mt-6"></div>
+                </div>
+                <div id="assignment-results-card" class="card" style="display: none;">
+                    <h2>All-or-Nothing Assignment Results</h2>
+                     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div id="assignment-table-container" class="overflow-x-auto"></div>
+                        <div>
+                             <h3 class="text-center font-semibold mb-2">Assigned Volume Graph</h3>
+                             <div id="assignment-graph-container" class="graph-container w-full aspect-video"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let nodes = [], links = [], selectedNode = null, nextNodeId = 0;
+    let addNodeMode = false, deleteMode = false;
+    let shortestPaths = new Map();
+
+    const graphContainer = document.getElementById('graph-container');
+    const width = graphContainer.clientWidth, height = width * 9 / 16;
+    const addNodeBtn = document.getElementById('addNodeBtn'), deleteBtn = document.getElementById('deleteBtn');
+
+    const svg = d3.select("#graph-container").append("svg").attr("width", width).attr("height", height)
+        .on("click", (event) => {
+            if (addNodeMode && event.target.tagName === 'svg') createNodeAtPoint(d3.pointer(event));
+            else if (!addNodeMode && !deleteMode && event.target.tagName === 'svg' && selectedNode) deselectNodes();
+        });
+
+    const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+        .force("charge", d3.forceManyBody().strength(-400))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .on("tick", ticked);
+
+    let linkGroup = svg.append("g").attr("class", "links");
+    let linkLabelGroup = svg.append("g").attr("class", "link-labels");
+    let nodeGroup = svg.append("g").attr("class", "nodes");
+    
+    function update() {
+        const node = nodeGroup.selectAll("g").data(nodes, d => d.id);
+        node.exit().remove();
+        const nodeEnter = node.enter().append("g")
+            .on("click", nodeClicked).on("dblclick", editNodeName)
+            .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+        nodeEnter.append("circle").attr("r", 20).attr("fill", d => d3.schemeCategory10[d.id % 10]);
+        nodeEnter.append("text").attr("class", "node-label").attr("dy", ".35em").text(d => d.name);
+        
+        const link = linkGroup.selectAll("line").data(links, d => `${d.source.id}-${d.target.id}`);
+        link.exit().remove();
+        link.enter().insert("line", "g").on("click", linkClicked);
+
+        const linkLabel = linkLabelGroup.selectAll("text").data(links, d => `${d.source.id}-${d.target.id}`);
+        linkLabel.exit().remove();
+        linkLabel.enter().append("text")
+            .attr("class", "link-label").attr("text-anchor", "middle").attr("dy", -5)
+            .text(d => d.time).on("dblclick", editLinkTime).on("click", linkClicked);
+
+        simulation.nodes(nodes);
+        simulation.force("link").links(links);
+        simulation.alpha(1).restart();
+        renderODMatrix();
+    }
+
+    function ticked() {
+        linkGroup.selectAll("line").attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        nodeGroup.selectAll("g").attr("transform", d => `translate(${d.x},${d.y})`);
+        linkLabelGroup.selectAll("text").attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+    }
+    
+    function toggleMode(mode) {
+        if (mode === 'add') {
+            addNodeMode = !addNodeMode;
+            if (deleteMode) toggleMode('delete');
+        } else if (mode === 'delete') {
+            deleteMode = !deleteMode;
+            if (addNodeMode) toggleMode('add');
+        }
+        addNodeBtn.textContent = addNodeMode ? "Click canvas to place" : "Add Node";
+        addNodeBtn.classList.toggle('btn-success', addNodeMode);
+        addNodeBtn.classList.toggle('btn-secondary', !addNodeMode);
+        graphContainer.classList.toggle('add-mode', addNodeMode);
+        deleteBtn.textContent = deleteMode ? "Click item to delete" : "Delete Mode";
+        deleteBtn.classList.toggle('btn-danger', deleteMode);
+        deleteBtn.classList.toggle('btn-secondary', !deleteMode);
+        graphContainer.classList.toggle('delete-mode', deleteMode);
+        if (addNodeMode || deleteMode) deselectNodes();
+    }
+
+    function createNodeAtPoint([x, y]) {
+        const name = String.fromCharCode(65 + (nextNodeId % 26));
+        nodes.push({ id: nextNodeId++, name: name, x, y, fx: x, fy: y });
+        update();
+        toggleMode('add');
+    }
+
+    function removeNode(event, d) {
+        event.preventDefault();
+        nodes = nodes.filter(n => n.id !== d.id);
+        links = links.filter(l => l.source.id !== d.id && l.target.id !== d.id);
+        if (selectedNode === d) deselectNodes();
+        update();
+    }
+    function removeLink(event, d) { event.preventDefault(); links = links.filter(l => l !== d); update(); }
+    
+    function editNodeName(event, d) { event.stopPropagation(); const newName = prompt("New name:", d.name); if(newName) { d.name = newName; nodeGroup.selectAll("g").select("text").text(n=>n.name); renderODMatrix();} }
+    function editLinkTime(event, d) { event.stopPropagation(); const newTime = prompt("New time:", d.time); if(newTime && !isNaN(newTime)) { d.time = +newTime; linkLabelGroup.selectAll("text").text(l=>l.time); } }
+
+    function nodeClicked(event, d) {
+        event.stopPropagation();
+        if (addNodeMode) return;
+        if (deleteMode) { removeNode(event, d); return; }
+        if (!selectedNode) {
+            selectedNode = d;
+            d3.select(event.currentTarget).select('circle').classed('selected', true);
+        } else {
+            if (selectedNode.id !== d.id && !linkExists(selectedNode, d)) {
+                const time = prompt(`Travel time from ${selectedNode.name} to ${d.name}:`);
+                if (time && !isNaN(time)) { links.push({ source: selectedNode, target: d, time: +time }); update(); }
+            }
+            deselectNodes();
+        }
+    }
+    
+    function linkClicked(event, d) { event.stopPropagation(); if(deleteMode) removeLink(event, d); }
+    function deselectNodes() { selectedNode = null; nodeGroup.selectAll("circle").classed("selected", false); }
+    function linkExists(n1, n2) { return links.some(l => (l.source.id === n1.id && l.target.id === n2.id) || (l.source.id === n2.id && l.target.id === n1.id)); }
+
+    function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+    function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); if (!addNodeMode) { d.fx = null; d.fy = null; }}
+
+    function clearAll() {
+        nodes = []; links = []; nextNodeId = 0; selectedNode = null;
+        if (addNodeMode) toggleMode('add'); if (deleteMode) toggleMode('delete');
+        document.getElementById('results-card').style.display = 'none';
+        document.getElementById('od-card').style.display = 'none';
+        document.getElementById('assignment-results-card').style.display = 'none';
+        update();
+    }
+    
+    function renderODMatrix() {
+        const card = document.getElementById('od-card');
+        if (nodes.length < 2) { card.style.display = 'none'; return; }
+        let table = `<table class="w-full text-sm od-table"><thead><tr><th>O \\ D</th>${nodes.map(n=>`<th>${n.name}</th>`).join('')}</tr></thead><tbody>`;
+        nodes.forEach(origin => {
+            table += `<tr><td>${origin.name}</td>`;
+            nodes.forEach(dest => {
+                if (origin.id === dest.id) table += `<td>-</td>`;
+                else table += `<td><input type="number" class="od-input" data-origin="${origin.id}" data-dest="${dest.id}"></td>`;
+            });
+            table += `</tr>`;
+        });
+        document.getElementById('od-matrix-container').innerHTML = table + `</tbody></table>`;
+        card.style.display = 'block';
+    }
+
+    function randomizeOD() {
+        document.querySelectorAll('.od-input').forEach(input => {
+            input.value = Math.floor(Math.random() * 451) + 50; // Random number between 50 and 500
+        });
+    }
+
+    function randomizeNetwork() {
+        const numNodes = parseInt(prompt("Enter number of nodes for the random network:", "5"));
+        if (!numNodes || numNodes < 2) return;
+        clearAll();
+        for (let i = 0; i < numNodes; i++) {
+            nodes.push({ id: nextNodeId++, name: String.fromCharCode(65 + i), x: Math.random() * width, y: Math.random() * height });
+        }
+        for (let i = 1; i < numNodes; i++) { // Create a spanning tree to ensure connectivity
+            const target = Math.floor(Math.random() * i);
+            links.push({ source: nodes[i], target: nodes[target], time: Math.floor(Math.random() * 20) + 5 });
+        }
+        const extraEdges = Math.floor(numNodes / 2); // Add some extra edges for cycles
+        for (let i = 0; i < extraEdges; i++) {
+            const n1 = nodes[Math.floor(Math.random() * numNodes)];
+            const n2 = nodes[Math.floor(Math.random() * numNodes)];
+            if (n1.id !== n2.id && !linkExists(n1, n2)) {
+                links.push({ source: n1, target: n2, time: Math.floor(Math.random() * 20) + 5 });
+            }
+        }
+        update();
+    }
+
+    function calculateShortestPaths() {
+        if (nodes.length < 2) return alert("Please add at least two nodes.");
+        const resultsBody = document.getElementById('results-table-container');
+        const dijkstraContainer = document.getElementById('dijkstra-steps-container');
+        resultsBody.innerHTML = ''; dijkstraContainer.innerHTML = '';
+        shortestPaths.clear();
+        let resultsTable = `<table class="w-full text-sm"><thead><tr><th class="text-left">Origin</th><th class="text-left">Destination</th><th>Total Time</th><th class="text-left">Path</th></tr></thead><tbody>`;
+
+        nodes.forEach(startNode => {
+            const { dist, prev, steps } = runDijkstra(startNode);
+            displayDijkstraSteps(startNode, steps);
+            nodes.forEach(endNode => {
+                if (startNode.id === endNode.id) return;
+                const distance = dist.get(endNode.id);
+                let path = [];
+                if (distance !== Infinity) {
+                    let current = endNode;
+                    while (current) { path.unshift(current); current = prev.get(current.id); }
+                }
+                shortestPaths.set(`${startNode.id}-${endNode.id}`, path);
+                resultsTable += `<tr><td class="text-left">${startNode.name}</td><td class="text-left">${endNode.name}</td><td>${distance === Infinity ? 'N/A' : distance}</td><td class="text-left">${distance === Infinity ? 'No path' : path.map(p=>p.name).join(' → ')}</td></tr>`;
+            });
+        });
+        resultsBody.innerHTML = resultsTable + `</tbody></table>`;
+        document.getElementById('results-card').style.display = 'block';
+        document.getElementById('assignBtn').disabled = false;
+    }
+    
+    function calculateTripAssignment() {
+        const linkVolumes = new Map();
+        links.forEach(l => {
+            const key = l.source.id < l.target.id ? `${l.source.id}-${l.target.id}` : `${l.target.id}-${l.source.id}`;
+            linkVolumes.set(key, {link: l, total: 0, components: []});
+        });
+        
+        document.querySelectorAll('.od-input').forEach(input => {
+            const trips = parseFloat(input.value) || 0;
+            if (trips > 0) {
+                const path = shortestPaths.get(`${input.dataset.origin}-${input.dataset.dest}`);
+                if (path && path.length > 1) {
+                    for (let i=0; i < path.length - 1; i++) {
+                        const u = path[i].id, v = path[i+1].id;
+                        const key = u < v ? `${u}-${v}` : `${v}-${u}`;
+                        if (linkVolumes.has(key)) {
+                            linkVolumes.get(key).total += trips;
+                            linkVolumes.get(key).components.push({from: path[0].name, to: path[path.length-1].name, trips});
+                        }
+                    }
+                }
+            }
+        });
+        
+        displayAssignmentResults(linkVolumes);
+        displayAssignmentGraph(linkVolumes);
+    }
+    
+    function displayAssignmentGraph(linkVolumes) {
+        const container = document.getElementById('assignment-graph-container');
+        container.innerHTML = '';
+        const assignmentSvg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+        const color = d3.scaleSequential(d3.interpolateReds).domain([0, d3.max(Array.from(linkVolumes.values()), d => d.total) || 1]);
+        
+        const assignmentSim = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+        
+        const maxVolume = d3.max(Array.from(linkVolumes.values()), d => d.total) || 1;
+        const widthScale = d3.scaleLinear().domain([0, maxVolume]).range([1, 15]);
+
+        assignmentSim.on("tick", () => {
+            assignmentSvg.selectAll(".link").attr("x1", d=>d.source.x).attr("y1", d=>d.source.y).attr("x2", d=>d.target.x).attr("y2", d=>d.target.y);
+            assignmentSvg.selectAll(".node").attr("transform", d => `translate(${d.x},${d.y})`);
+            assignmentSvg.selectAll(".vol-label").attr("x", d=>(d.source.x+d.target.x)/2).attr("y", d=>(d.source.y+d.target.y)/2);
+        });
+        
+        assignmentSvg.append("g").selectAll("line").data(links).enter().append("line").attr("class", "link")
+            .style("stroke-width", d => {
+                const key = d.source.id < d.target.id ? `${d.source.id}-${d.target.id}` : `${d.target.id}-${d.source.id}`;
+                return widthScale(linkVolumes.get(key)?.total || 0) + 'px';
+            })
+            .style("stroke", "#555");
+        
+        const nodeEnter = assignmentSvg.append("g").selectAll("g").data(nodes).enter().append("g").attr("class", "node");
+        nodeEnter.append("circle").attr("r", 20).attr("fill", d => d3.schemeCategory10[d.id % 10]);
+        nodeEnter.append("text").attr("class", "node-label").attr("dy", ".35em").text(d => d.name);
+        
+        assignmentSvg.append("g").selectAll("text").data(links).enter().append("text").attr("class", "vol-label")
+            .attr("dy", -5).attr("text-anchor", "middle").text(d => {
+                const key = d.source.id < d.target.id ? `${d.source.id}-${d.target.id}` : `${d.target.id}-${d.source.id}`;
+                return linkVolumes.get(key)?.total || 0;
+            });
+    }
+
+    function displayAssignmentResults(linkVolumes) {
+        // Implementation from previous turn
+        const container = document.getElementById('assignment-table-container');
+        let html = `<table class="w-full text-sm calculation-table"><thead><tr><th class="text-left">Link</th><th class="text-left">Calculation</th><th>Total Volume</th></tr></thead><tbody>`;
+        for (const [key, data] of linkVolumes.entries()) {
+            if (data.total > 0) {
+                const calcString = data.components.map(c => `${c.trips} <sub>(${c.from}-${c.to})</sub>`).join(' + ');
+                html += `<tr><td class="text-left">${data.link.source.name} ↔ ${data.link.target.name}</td><td class="text-left">${calcString}</td><td>${data.total}</td></tr>`;
+            }
+        }
+        container.innerHTML = html + `</tbody></table>`;
+        document.getElementById('assignment-results-card').style.display = 'block';
+    }
+
+    function runDijkstra(startNode) {
+        // Implementation from previous turn
+        const dist = new Map(), prev = new Map(), pq = new Set(nodes.map(n => n.id)), nodeMap = new Map(nodes.map(n => [n.id, n])), steps = [];
+        let stepCount = 0;
+        nodes.forEach(node => { dist.set(node.id, Infinity); prev.set(node.id, null); });
+        dist.set(startNode.id, 0);
+        while (pq.size > 0) {
+            let u_id = null, min_dist = Infinity;
+            for (const nodeId of pq) { if (dist.get(nodeId) < min_dist) { min_dist = dist.get(nodeId); u_id = nodeId; } }
+            if (u_id === null || min_dist === Infinity) break;
+            const u = nodeMap.get(u_id); pq.delete(u_id);
+            steps.push({ step: ++stepCount, visited: u.name, distances: new Map(dist) });
+            const neighbors = links.filter(l => l.source.id === u.id || l.target.id === u.id).map(l => l.source.id === u.id ? l.target : l.source);
+            for (const v of neighbors) {
+                const link = links.find(l => (l.source.id === u.id && l.target.id === v.id) || (l.source.id === v.id && l.target.id === u.id));
+                const alt = dist.get(u.id) + link.time;
+                if (alt < dist.get(v.id)) { dist.set(v.id, alt); prev.set(v.id, u); }
+            }
+        }
+        return { dist, prev, steps };
+    }
+
+    function displayDijkstraSteps(startNode, steps) {
+        // Implementation from previous turn
+        const container = document.getElementById('dijkstra-steps-container');
+        let html = `<h3 class="text-lg font-semibold mt-8 border-t pt-4">Dijkstra's Calculation from Origin: ${startNode.name}</h3>`;
+        html += `<table class="w-full text-sm mt-2 calculation-table"><thead><tr><th>Step</th><th>Visiting</th>`;
+        nodes.forEach(n => html += `<th>Dist(${n.name})</th>`);
+        html += `</tr></thead><tbody>`;
+        steps.forEach(step => {
+            html += `<tr><td>${step.step}</td><td>${step.visited}</td>`;
+            nodes.forEach(n => { const d = step.distances.get(n.id); html += `<td>${d === Infinity ? '∞' : d}</td>`; });
+            html += `</tr>`;
+        });
+        container.innerHTML += html + `</tbody></table>`;
+    }
+    
+    document.getElementById('addNodeBtn').addEventListener('click', () => toggleMode('add'));
+    document.getElementById('deleteBtn').addEventListener('click', () => toggleMode('delete'));
+    document.getElementById('clearBtn').addEventListener('click', clearAll);
+    document.getElementById('randomizeNetBtn').addEventListener('click', randomizeNetwork);
+    document.getElementById('randomizeODBtn').addEventListener('click', randomizeOD);
+    document.getElementById('calculateBtn').addEventListener('click', calculateShortestPaths);
+    document.getElementById('assignBtn').addEventListener('click', calculateTripAssignment);
+
+    // Initial state
+    nodes.push({id: nextNodeId++, name: 'A', x: width/4, y: height/2});
+    nodes.push({id: nextNodeId++, name: 'B', x: width/2, y: height/2});
+    nodes.push({id: nextNodeId++, name: 'C', x: 3*width/4, y: height/2});
+    links.push({ source: nodes[0], target: nodes[1], time: 10 });
+    links.push({ source: nodes[1], target: nodes[2], time: 12 });
+    update();
+});
+</script>
+
+</body>
+</html>
