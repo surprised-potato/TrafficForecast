@@ -103,6 +103,7 @@
                     <h3>Intermediate Table: A_j * F_ij * K_ij</h3>
                     <p class="text-sm text-gray-500 mb-2">This table shows the product of attractions, friction factors, and K-factors (assumed to be 1) for each zone pair.</p>
                     <div id="intermediateTableContainer" class="overflow-x-auto"></div>
+                    <div id="intermediate-calcs"></div>
                 </div>
                 <div class="card">
                     <h3 class="mb-4">Final Result: Trip Distribution Table (T_ij)</h3>
@@ -192,6 +193,7 @@
             const intermediateMatrix = Array.from({length: numZones}, (_, i) => Array.from({length: numZones}, (_, j) => attractions[j] * frictionMatrix[i][j]));
             
             renderMatrix('intermediateTableContainer', intermediateMatrix, 'A_j * F_ij');
+            showIntermediateCalcDetails(attractions, frictionMatrix);
             
             distributionStepsContainer.innerHTML += createDistributionStepHTML('singly', 'Iteration 1: Singly Constrained Distribution');
             document.getElementById('calcSinglyBtn').addEventListener('click', calculateSinglyConstrainedDistribution);
@@ -297,6 +299,20 @@
                         <div id="${id}-results" class="overflow-x-auto mt-4"></div>
                         <div id="${id}-calcs"></div>
                     </div>`;
+        };
+        
+        const showIntermediateCalcDetails = (attrs, fMatrix) => {
+            const calcDiv = document.getElementById('intermediate-calcs');
+            let html = `<div class="calculation-box mt-4">
+                            <span class="formula">Value at (row i, col j) = A_j * F_ij</span>`;
+            for (let i = 0; i < numZones; i++) {
+                html += `<strong class="block mt-2">For Origin Zone ${i + 1}:</strong>`;
+                for (let j = 0; j < numZones; j++) {
+                    const result = attrs[j] * fMatrix[i][j];
+                    html += `Cell(${i + 1},${j + 1}) = A_${j + 1} * F_(${i+1},${j+1}) = ${attrs[j]} * ${fMatrix[i][j].toFixed(1)} = ${result.toFixed(0)}<br>`;
+                }
+            }
+            calcDiv.innerHTML = html + '</div>';
         };
     
         const showSinglyCalcDetails = (prods, attrs, fMatrix, denoms) => {
