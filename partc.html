@@ -125,17 +125,17 @@
         };
     
         const init = () => {
-            // Default setup from user's image
+            // Default setup
             addCharacteristic('T1 (Total Time)');
             addCharacteristic('T2 (Wait Time)');
             addCharacteristic('C (Cost)');
             addMode('Auto');
             addMode('Transit');
             
-            // Populate default utility functions
+            // Populate default utility functions based on the provided image
             const utilityDefaults = {
                 'Auto': [-0.46, -0.35, -0.08, -0.005],
-                'Transit': [-0.07, -0.05, -0.15, -0.005]
+                'Transit': [-0.07, -0.35, -0.08, -0.005]
             };
             document.querySelectorAll('#utilityFunctionsTable tbody tr').forEach((row, rowIndex) => {
                 row.querySelectorAll('input').forEach((input, colIndex) => {
