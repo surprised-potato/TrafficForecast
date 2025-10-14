@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4-Step Transportation Planning Model</title>
+    <title>Part A: Trip Generation - 4-Step Model</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +14,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* A light gray background */
+            background-color: #f3f4f6;
         }
         .step-card {
             background-color: white;
@@ -20,7 +22,6 @@
             padding: 2rem;
             margin-bottom: 2rem;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            transition: all 0.3s ease-in-out;
         }
         .step-card h2 {
             font-size: 1.5rem;
@@ -87,28 +88,6 @@
         .btn-danger { background-color: #ef4444; color: white; }
         .btn-danger:hover { background-color: #dc2626; }
         
-        /* Tab Styles */
-        .tab-button {
-            padding: 0.75rem 1.5rem;
-            cursor: pointer;
-            border: none;
-            background: none;
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: #6b7280;
-            border-bottom: 3px solid transparent;
-            text-decoration: none;
-        }
-        .tab-button.active {
-            color: #4f46e5;
-            border-bottom-color: #4f46e5;
-        }
-        .tab-button.disabled {
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-        
-        /* Collapsible Section Styles */
         details summary {
             font-size: 1.25rem;
             font-weight: 700;
@@ -144,20 +123,22 @@
     <div class="max-w-7xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800">The 4-Step Transportation Planning Model</h1>
-            <p class="text-lg text-gray-600 mt-2">An interactive tool for understanding travel demand forecasting.</p>
+            <p class="text-lg text-gray-600 mt-2">Part A: Trip Generation</p>
         </header>
 
-        <div class="border-b border-gray-200 mb-6">
-            <nav class="flex flex-wrap -mb-px justify-center bg-white rounded-t-lg p-2 shadow-sm">
-                <a href="index.html" class="tab-button active">Part A: Trip Generation</a>
-                <a href="partb.html" class="tab-button">Part B: Trip Distribution</a>
-                <a href="partc.html" class="tab-button">Part C: Mode Choice</a>
-                <a href="partd.html" class="tab-button">Part D: Trip Assignment</a>
-            </nav>
-        </div>
+        <!-- Navigation -->
+        <nav class="bg-white rounded-lg shadow-sm mb-8 p-2 flex justify-center flex-wrap">
+             <a href="parta.html" class="px-4 py-2 text-indigo-600 font-bold border-b-2 border-indigo-600">Part A</a>
+             <a href="partb.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part B</a>
+             <a href="partc.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part C</a>
+             <a href="partd.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Part D</a>
+             <a href="app.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">Simplified Tool</a>
+        </nav>
 
+        <!-- Tab Content -->
         <div id="partA">
             
+            <!-- Collapsible Section 1: Model Building -->
             <details>
                 <summary>1. Modeling with Cross-Categorization</summary>
                 <div class="collapsible-content">
@@ -214,6 +195,7 @@
                 </div>
             </details>
 
+            <!-- Collapsible Section 2: Model Application -->
             <details>
                 <summary>2. Applying the Model (Trip Production)</summary>
                 <div class="collapsible-content">
@@ -252,6 +234,7 @@
                 </div>
             </details>
             
+            <!-- Collapsible Section 3: Trip Attraction -->
             <details>
                 <summary>3. Trip Attraction Calculation</summary>
                 <div class="collapsible-content">
@@ -280,6 +263,7 @@
                 </div>
             </details>
 
+            <!-- Collapsible Section 4: Trip Balancing -->
             <details>
                 <summary>4. Trip Balancing</summary>
                  <div class="collapsible-content">

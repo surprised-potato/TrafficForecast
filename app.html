@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplified Traffic Forecast App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .step-card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .step-card summary { font-size: 1.5rem; font-weight: 700; color: #111827; cursor: pointer; padding: 1.5rem; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        .step-card summary::-webkit-details-marker { display: none; }
+        .step-card summary::after { content: '▼'; transition: transform 0.2s; font-size: 1rem; }
+        .step-card[open] summary::after { transform: rotate(180deg); }
+        .step-card .content { padding: 0 1.5rem 1.5rem; border-top: 1px solid #e5e7eb; }
+        .step-card[data-step-status="disabled"] { background-color: #f9fafb; }
+        .step-card[data-step-status="disabled"] summary { color: #9ca3af; cursor: not-allowed; }
+        .step-card[data-step-status="disabled"] summary::after { content: '🔒'; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: center; padding: 0.75rem; border: 1px solid #e5e7eb; }
+        th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; text-align: center; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease-in-out; border: none; display: inline-flex; justify-content:center; align-items: center; gap: 0.5rem; }
+        .btn-primary { background-color: #4f46e5; color: white; } .btn-primary:hover:not(:disabled) { background-color: #4338ca; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; } .btn-secondary:hover { background-color: #d1d5db; }
+        .btn:disabled { background-color: #d1d5db; color: #6b7280; cursor: not-allowed; }
+        
+        /* Graph Styles */
+        .graph-container { border: 1px solid #d1d5db; border-radius: 0.5rem; background-color: #fdfdff; }
+        .links line { stroke: #999; stroke-opacity: 0.6; }
+        .nodes g:hover > circle { stroke: #fbbf24; stroke-width: 3px; }
+        .nodes circle { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+        .nodes circle.selected { stroke: #f97316; stroke-width: 4px; }
+        .node-label { font-size: 14px; font-weight:bold; pointer-events: none; text-anchor: middle; fill: white; }
+        .link-label { font-size: 10px; fill: #4b5563; font-weight: bold; }
+
+        /* Modal Styles */
+        .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
+        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 500px; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="text-center mb-4">
+            <h1 class="text-4xl font-bold text-gray-800">Self-Contained Traffic Forecast Tool</h1>
+            <p class="text-lg text-gray-600 mt-2">A step-by-step application to model and visualize traffic flow.</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-white rounded-lg shadow-sm mb-8 p-2 flex justify-center sticky top-2 z-10">
+             <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-indigo-600 font-semibold">4-Step Model Details</a>
+             <a href="#" class="px-4 py-2 text-indigo-600 font-bold border-b-2 border-indigo-600">Simplified Forecast Tool</a>
+        </nav>
+
+        <!-- Step 1: Trip Generation -->
+        <details id="step1" class="step-card" open>
+            <summary>Step 1: Zone & Trip Generation</summary>
+            <div class="content space-y-6">
+                <p class="text-gray-600">Define your study area by adding zones and their socio-economic data. The tool will calculate trip productions (P) and attractions (A) based on this data.</p>
+                <div>
+                    <h3 class="font-semibold text-lg mb-2">Zonal Data</h3>
+                    <div class="overflow-x-auto">
+                        <table id="zonalDataTable">
+                            <thead>
+                                <tr><th>Zone</th><th>Households</th><th>Retail Emp.</th><th>Non-Retail Emp.</th><th></th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <button id="addZoneBtn" class="btn btn-secondary mt-4">Add Zone</button>
+                </div>
+                <button id="calculateGenerationBtn" class="btn btn-primary w-full text-lg">Calculate Productions & Attractions</button>
+                <div id="generationOutput" style="display:none;">
+                    <h3 class="font-semibold text-lg mb-2">Balanced Productions & Attractions</h3>
+                    <div id="paTableContainer" class="overflow-x-auto"></div>
+                </div>
+            </div>
+        </details>
+
+        <!-- Step 2: Network & Trip Distribution -->
+        <details id="step2" class="step-card" data-step-status="disabled">
+            <summary>Step 2: Network & Trip Distribution</summary>
+            <div class="content space-y-6">
+                <p class="text-gray-600">Create the transportation network by drawing links between the zones defined in Step 1. Enter the travel characteristics for each link, which will be used to automatically calculate travel matrices.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">Network Graph</h3>
+                         <div id="graph-container" class="graph-container w-full aspect-video"></div>
+                    </div>
+                    <div>
+                         <h3 class="font-semibold text-lg mb-2">Instructions</h3>
+                        <ul class="list-disc list-inside space-y-2 text-gray-600 bg-gray-50 p-4 rounded-lg">
+                            <li>Your zones from Step 1 are automatically added as nodes.</li>
+                            <li>To add a road, click one node (it turns orange), then another.</li>
+                            <li>A pop-up will ask for the travel characteristics for that road.</li>
+                             <li>To delete a link, simply double-click it.</li>
+                        </ul>
+                    </div>
+                </div>
+                <button id="calculateDistributionBtn" class="btn btn-primary w-full text-lg">Distribute Trips (Gravity Model)</button>
+                <div id="distributionOutput" style="display:none;">
+                    <h3 class="font-semibold text-lg mb-2">Origin-Destination (O-D) Matrix</h3>
+                    <div id="odMatrixContainer" class="overflow-x-auto"></div>
+                </div>
+            </div>
+        </details>
+        
+        <!-- Step 3: Mode Choice -->
+        <details id="step3" class="step-card" data-step-status="disabled">
+            <summary>Step 3: Mode Choice</summary>
+            <div class="content space-y-6">
+                 <p class="text-gray-600">Define the utility functions for your travel modes. The tool will use these formulas and the network data from Step 2 to predict the percentage of trips taken by each mode.</p>
+                 <div>
+                    <h3 class="font-semibold text-lg mb-2">Utility Function Coefficients</h3>
+                    <div id="utilityFunctionContainer" class="overflow-x-auto"></div>
+                 </div>
+                 <button id="calculateModeChoiceBtn" class="btn btn-primary w-full text-lg">Calculate Mode Split</button>
+                 <div id="modeChoiceOutput" style="display:none;">
+                    <h3 class="font-semibold text-lg mb-2">Modal O-D Matrices</h3>
+                    <div id="modalODMatrixContainer" class="space-y-4"></div>
+                 </div>
+            </div>
+        </details>
+
+        <!-- Step 4: Trip Assignment -->
+        <details id="step4" class="step-card" data-step-status="disabled">
+            <summary>Step 4: Trip Assignment & Final Map</summary>
+            <div class="content space-y-6">
+                <p class="text-gray-600">This final step assigns the trips for each mode to the network, producing a complete traffic forecast map. Link thickness represents total volume, and colors show the modal split.</p>
+                <button id="generateForecastBtn" class="btn btn-primary w-full text-lg">Generate Forecast Map</button>
+                <div id="assignmentOutput" style="display:none;">
+                    <h3 class="font-semibold text-lg mb-2">Forecast Map</h3>
+                    <div id="final-graph-container" class="graph-container w-full aspect-video"></div>
+                     <div id="legend" class="flex justify-center gap-4 mt-4"></div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Modal for Link Data -->
+    <div id="linkModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-content">
+            <h2 id="modalTitle" class="text-xl font-bold mb-4">Add Link Characteristics</h2>
+            <div id="modalForm" class="space-y-3"></div>
+            <div class="flex gap-4 mt-6">
+                <button id="saveLinkBtn" class="btn btn-primary w-full">Save Link</button>
+                <button id="cancelLinkBtn" class="btn btn-secondary w-full">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Global State ---
+        let zones = [];
+        let productions = [], attractions = [];
+        let odMatrix = [];
+        let modalODMatrices = {};
+        let network = { nodes: [], links: [] };
+        let selectedNode = null;
+
+        // --- Step 1: Trip Generation ---
+        const addZoneBtn = document.getElementById('addZoneBtn');
+        const zonalDataTable = document.querySelector('#zonalDataTable tbody');
+        
+        const addZoneRow = (zoneData = {}) => {
+            const newIndex = zones.length;
+            const zone = {
+                id: newIndex,
+                name: `Zone ${newIndex + 1}`,
+                households: zoneData.households || 0,
+                retail: zoneData.retail || 0,
+                nonretail: zoneData.nonretail || 0
+            };
+            zones.push(zone);
+            renderZoneTable();
+        };
+
+        const renderZoneTable = () => {
+            zonalDataTable.innerHTML = '';
+            zones.forEach((zone, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" value="${zone.name}" data-id="${index}" class="zone-name"></td>
+                    <td><input type="number" value="${zone.households}" data-id="${index}" class="zone-hh"></td>
+                    <td><input type="number" value="${zone.retail}" data-id="${index}" class="zone-retail"></td>
+                    <td><input type="number" value="${zone.nonretail}" data-id="${index}" class="zone-nonretail"></td>
+                    <td><button data-id="${index}" class="remove-zone-btn text-red-500 font-bold">✖</button></td>
+                `;
+                zonalDataTable.appendChild(row);
+            });
+        };
+
+        zonalDataTable.addEventListener('change', e => {
+            if (e.target.dataset.id) {
+                const id = parseInt(e.target.dataset.id);
+                if (e.target.classList.contains('zone-name')) zones[id].name = e.target.value;
+                if (e.target.classList.contains('zone-hh')) zones[id].households = parseInt(e.target.value) || 0;
+                if (e.target.classList.contains('zone-retail')) zones[id].retail = parseInt(e.target.value) || 0;
+                if (e.target.classList.contains('zone-nonretail')) zones[id].nonretail = parseInt(e.target.value) || 0;
+            }
+        });
+        
+        zonalDataTable.addEventListener('click', e => {
+            if(e.target.classList.contains('remove-zone-btn')) {
+                 const id = parseInt(e.target.dataset.id);
+                 zones.splice(id, 1);
+                 // Re-index zones
+                 zones.forEach((z, i) => z.id = i);
+                 renderZoneTable();
+            }
+        });
+
+        addZoneBtn.addEventListener('click', () => addZoneRow());
+
+        document.getElementById('calculateGenerationBtn').addEventListener('click', () => {
+            // Hardcoded trip rates (can be moved to UI inputs for more flexibility)
+            const P_RATE = 10; // trips per household
+            const A_RETAIL_RATE = 4;
+            const A_NONRETAIL_RATE = 2;
+
+            productions = zones.map(z => z.households * P_RATE);
+            attractions = zones.map(z => (z.retail * A_RETAIL_RATE) + (z.nonretail * A_NONRETAIL_RATE));
+            
+            const totalP = productions.reduce((a, b) => a + b, 0);
+            const totalA = attractions.reduce((a, b) => a + b, 0);
+
+            if (totalA > 0) {
+                const factor = totalP / totalA;
+                attractions = attractions.map(a => Math.round(a * factor));
+                // Adjust last element to ensure sum is perfect
+                const newTotalA = attractions.reduce((a,b)=>a+b, 0);
+                attractions[attractions.length - 1] += totalP - newTotalA;
+            }
+            
+            let paHTML = `<table class="w-full"><thead><tr><th>Zone</th><th>Productions (P)</th><th>Attractions (A)</th></tr></thead><tbody>`;
+            zones.forEach((zone, i) => {
+                paHTML += `<tr><td>${zone.name}</td><td>${productions[i]}</td><td>${attractions[i]}</td></tr>`;
+            });
+             paHTML += `<tr class="font-bold bg-gray-50"><td>Total</td><td>${productions.reduce((a,b)=>a+b,0)}</td><td>${attractions.reduce((a,b)=>a+b,0)}</td></tr>`;
+            paHTML += `</tbody></table>`;
+            document.getElementById('paTableContainer').innerHTML = paHTML;
+            document.getElementById('generationOutput').style.display = 'block';
+            
+            enableStep(2);
+        });
+
+        // --- Step 2: Network & Distribution ---
+        const graphContainer = document.getElementById('graph-container');
+        const width = graphContainer.clientWidth, height = width * 9 / 16;
+        const svg = d3.select("#graph-container").append("svg").attr("width", width).attr("height", height);
+        
+        const simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-600))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        let linkGroup, nodeGroup;
+        
+        function updateGraph() {
+            svg.selectAll("*").remove(); // Clear previous graph
+            linkGroup = svg.append("g").attr("class", "links");
+            nodeGroup = svg.append("g").attr("class", "nodes");
+            
+            const link = linkGroup.selectAll("line").data(network.links, d => `${d.source.id}-${d.target.id}`);
+            link.exit().remove();
+            const linkEnter = link.enter().append("line").attr("stroke-width", 3)
+                .on("dblclick", (e, d) => {
+                    network.links = network.links.filter(l => l !== d);
+                    updateGraph();
+                });
+
+            const node = nodeGroup.selectAll("g").data(network.nodes, d => d.id);
+            node.exit().remove();
+            const nodeEnter = node.enter().append("g").on("click", nodeClicked);
+            nodeEnter.append("circle").attr("r", 25).attr("fill", (d,i) => d3.schemeCategory10[i % 10]);
+            nodeEnter.append("text").attr("class", "node-label").text(d => d.name).attr("dy", ".35em");
+
+            simulation.nodes(network.nodes).on("tick", () => {
+                const radius = 25;
+                nodeEnter.attr("transform", d => {
+                    d.x = Math.max(radius, Math.min(width - radius, d.x));
+                    d.y = Math.max(radius, Math.min(height - radius, d.y));
+                    return `translate(${d.x},${d.y})`;
+                });
+
+                linkEnter.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                         .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            });
+            simulation.force("link").links(network.links);
+            simulation.alpha(1).restart();
+        }
+        
+        function nodeClicked(event, d) {
+            if (!selectedNode) {
+                selectedNode = d;
+                d3.select(event.currentTarget).select('circle').classed('selected', true);
+            } else {
+                 if (selectedNode.id !== d.id && !linkExists(selectedNode, d)) {
+                     openLinkModal(selectedNode, d);
+                 }
+                selectedNode = null;
+                nodeGroup.selectAll("circle").classed("selected", false);
+            }
+        }
+        const linkExists = (n1, n2) => network.links.some(l => (l.source.id === n1.id && l.target.id === n2.id) || (l.source.id === n2.id && l.target.id === n1.id));
+        
+        document.getElementById('calculateDistributionBtn').addEventListener('click', () => {
+            // 1. Calculate travel time matrix from graph (using Dijkstra)
+            const timeMatrix = calculateMatrix('auto_time');
+            
+            // 2. Apply Gravity Model
+            const frictionFactors = new Map([[1,82],[2,52],[3,50],[4,41],[5,39],[6,26],[7,20],[8,13]]);
+            const getFrictionFactor = (time) => {
+                time = Math.round(time);
+                return frictionFactors.get(time) || frictionFactors.get(8); // Simple lookup
+            }
+
+            odMatrix = Array(zones.length).fill(0).map(() => Array(zones.length).fill(0));
+            for (let i = 0; i < zones.length; i++) {
+                let denominator = 0;
+                for (let k = 0; k < zones.length; k++) {
+                    denominator += attractions[k] * getFrictionFactor(timeMatrix[i][k]);
+                }
+                for (let j = 0; j < zones.length; j++) {
+                    if (denominator > 0) {
+                        const numerator = attractions[j] * getFrictionFactor(timeMatrix[i][j]);
+                        odMatrix[i][j] = Math.round(productions[i] * (numerator / denominator));
+                    }
+                }
+            }
+            
+            let odHTML = `<table class="w-full"><thead><tr><th>From \\ To</th>${zones.map(z => `<th>${z.name}</th>`).join('')}</tr></thead><tbody>`;
+            zones.forEach((zone, i) => {
+                odHTML += `<tr><td><b>${zone.name}</b></td>${odMatrix[i].map(val => `<td>${val}</td>`).join('')}</tr>`;
+            });
+            odHTML += `</tbody></table>`;
+            document.getElementById('odMatrixContainer').innerHTML = odHTML;
+            document.getElementById('distributionOutput').style.display = 'block';
+
+            enableStep(3);
+        });
+
+        // --- Step 3: Mode Choice ---
+        const UTILITY_SPECS = [
+            { mode: 'Auto', color: '#3b82f6' },
+            { mode: 'Transit', color: '#16a34a' }
+        ];
+        const CHARS = ['Constant', 'Time (mins)', 'Cost (cents)', 'Wait Time (mins)'];
+        
+        function renderUtilityFunctions() {
+            let html = `<table><thead><tr><th>Mode</th>${CHARS.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+            UTILITY_SPECS.forEach(spec => {
+                html += `<tr><td>${spec.mode}</td>`;
+                CHARS.forEach(char => html += `<td><input type="number" step="0.01" class="utility-coeff" data-mode="${spec.mode}" data-char="${char}"></td>`);
+                html += `</tr>`;
+            });
+            document.getElementById('utilityFunctionContainer').innerHTML = html + `</tbody></table>`;
+            // Set default values
+            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Constant"]').value = -0.46;
+            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Time (mins)"]').value = -0.35;
+            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Cost (cents)"]').value = -0.005;
+            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Wait Time (mins)"]').value = -0.08;
+            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Constant"]').value = -0.07;
+            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Time (mins)"]').value = -0.35;
+            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Cost (cents)"]').value = -0.005;
+            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Wait Time (mins)"]').value = -0.08;
+        }
+
+        document.getElementById('calculateModeChoiceBtn').addEventListener('click', () => {
+            const coeffs = {};
+            document.querySelectorAll('.utility-coeff').forEach(input => {
+                const {mode, char} = input.dataset;
+                if(!coeffs[mode]) coeffs[mode] = {};
+                coeffs[mode][char] = parseFloat(input.value) || 0;
+            });
+
+            const matrices = {
+                'Time (mins)': calculateMatrix('transit_time'),
+                'Cost (cents)': calculateMatrix('transit_cost'),
+                'Wait Time (mins)': calculateMatrix('transit_wait')
+            };
+            const autoTimeMatrix = calculateMatrix('auto_time');
+            const autoCostMatrix = calculateMatrix('auto_cost');
+
+            modalODMatrices = {};
+            UTILITY_SPECS.forEach(spec => modalODMatrices[spec.mode] = Array(zones.length).fill(0).map(() => Array(zones.length).fill(0)));
+
+            for (let i = 0; i < zones.length; i++) {
+                for (let j = 0; j < zones.length; j++) {
+                    if (i === j) continue;
+                    const utilities = {};
+                    let sumExpUtility = 0;
+                    
+                    const autoUtility = coeffs['Auto']['Constant'] + (coeffs['Auto']['Time (mins)'] * autoTimeMatrix[i][j]) + (coeffs['Auto']['Cost (cents)'] * autoCostMatrix[i][j]) + (coeffs['Auto']['Wait Time (mins)'] * 0);
+                    utilities['Auto'] = autoUtility;
+                    sumExpUtility += Math.exp(autoUtility);
+
+                    const transitUtility = coeffs['Transit']['Constant'] + (coeffs['Transit']['Time (mins)'] * matrices['Time (mins)'][i][j]) + (coeffs['Transit']['Cost (cents)'] * matrices['Cost (cents)'][i][j]) + (coeffs['Transit']['Wait Time (mins)']* matrices['Wait Time (mins)'][i][j]);
+                    utilities['Transit'] = transitUtility;
+                    sumExpUtility += Math.exp(transitUtility);
+                    
+                    UTILITY_SPECS.forEach(spec => {
+                        const prob = sumExpUtility > 0 ? Math.exp(utilities[spec.mode]) / sumExpUtility : 0;
+                        modalODMatrices[spec.mode][i][j] = Math.round(odMatrix[i][j] * prob);
+                    });
+                }
+            }
+
+            let modalHTML = '';
+            for (const mode in modalODMatrices) {
+                 modalHTML += `<div><h4 class="font-semibold text-md mb-1">${mode} Trips</h4><table class="w-full"><thead><tr><th>From \\ To</th>${zones.map(z => `<th>${z.name}</th>`).join('')}</tr></thead><tbody>`;
+                zones.forEach((zone, i) => {
+                    modalHTML += `<tr><td><b>${zone.name}</b></td>${modalODMatrices[mode][i].map(val => `<td>${val}</td>`).join('')}</tr>`;
+                });
+                modalHTML += `</tbody></table></div>`;
+            }
+            document.getElementById('modalODMatrixContainer').innerHTML = modalHTML;
+            document.getElementById('modeChoiceOutput').style.display = 'block';
+            enableStep(4);
+        });
+
+        // --- Step 4: Trip Assignment ---
+        document.getElementById('generateForecastBtn').addEventListener('click', () => {
+            const linkVolumes = new Map();
+            network.links.forEach(l => {
+                const key = `${Math.min(l.source.id, l.target.id)}-${Math.max(l.source.id, l.target.id)}`;
+                linkVolumes.set(key, { link: l, total: 0 });
+                UTILITY_SPECS.forEach(spec => linkVolumes.get(key)[spec.mode] = 0);
+            });
+
+            UTILITY_SPECS.forEach(spec => {
+                 const matrix = modalODMatrices[spec.mode];
+                 const timeMatrixKey = spec.mode === 'Auto' ? 'auto_time' : 'transit_time';
+                 const paths = findShortestPaths(timeMatrixKey);
+
+                 for (let i = 0; i < zones.length; i++) {
+                     for (let j = 0; j < zones.length; j++) {
+                         const trips = matrix[i][j];
+                         if (trips > 0 && paths[i][j]) {
+                             for(let k = 0; k < paths[i][j].length - 1; k++) {
+                                 const u = paths[i][j][k];
+                                 const v = paths[i][j][k+1];
+                                 const key = `${Math.min(u,v)}-${Math.max(u,v)}`;
+                                 if(linkVolumes.has(key)) {
+                                     linkVolumes.get(key)[spec.mode] += trips;
+                                     linkVolumes.get(key).total += trips;
+                                 }
+                             }
+                         }
+                     }
+                 }
+            });
+
+            renderFinalMap(linkVolumes);
+            document.getElementById('assignmentOutput').style.display = 'block';
+        });
+
+        function renderFinalMap(linkVolumes) {
+            const container = document.getElementById('final-graph-container');
+            container.innerHTML = '';
+            const fWidth = container.clientWidth, fHeight = fWidth * 9/16;
+            const fSvg = d3.select(container).append("svg").attr("width", fWidth).attr("height", fHeight);
+
+            const maxVolume = d3.max(Array.from(linkVolumes.values()), d => d.total) || 1;
+            const widthScale = d3.scaleLinear().domain([0, maxVolume]).range([2, 20]);
+
+            const fSim = d3.forceSimulation(network.nodes)
+                .force("link", d3.forceLink(network.links).id(d => d.id).distance(150))
+                .force("charge", d3.forceManyBody().strength(-600))
+                .force("center", d3.forceCenter(fWidth / 2, fHeight / 2));
+            
+            // Draw stacked segments for links
+            const fLinkGroup = fSvg.append("g");
+            linkVolumes.forEach(data => {
+                let offset = 0;
+                UTILITY_SPECS.forEach(spec => {
+                    const segmentWidth = (data[spec.mode] / data.total) * widthScale(data.total);
+                    if (segmentWidth > 0) {
+                         fLinkGroup.append("line")
+                            .datum(data.link)
+                            .attr("stroke", spec.color)
+                            .attr("stroke-width", segmentWidth)
+                            .attr("stroke-linecap", "butt")
+                            .style("transform", `translateY(${offset - (widthScale(data.total)/2) + (segmentWidth/2)}px)`);
+                        offset += segmentWidth;
+                    }
+                });
+            });
+            
+            const fNodeGroup = fSvg.append("g").selectAll("g").data(network.nodes).enter().append("g");
+            fNodeGroup.append("circle").attr("r", 25).attr("fill", (d,i)=>d3.schemeCategory10[i%10]);
+            fNodeGroup.append("text").attr("class", "node-label").text(d=>d.name).attr("dy",".35em");
+            
+            fSim.on("tick", () => {
+                const radius = 25;
+                fNodeGroup.attr("transform", d => {
+                    d.x = Math.max(radius, Math.min(fWidth - radius, d.x));
+                    d.y = Math.max(radius, Math.min(fHeight - radius, d.y));
+                    return `translate(${d.x},${d.y})`;
+                });
+                
+                fLinkGroup.selectAll("line")
+                    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            });
+
+            document.getElementById('legend').innerHTML = UTILITY_SPECS.map(s => `
+                <div class="flex items-center gap-2"><div style="width:20px; height:20px; background-color:${s.color}; border-radius: 4px;"></div><span>${s.mode}</span></div>
+            `).join('');
+        }
+
+        // --- Link Modal ---
+        const linkModal = document.getElementById('linkModal');
+        let currentLink = {};
+        
+        function openLinkModal(source, target) {
+            currentLink = { source, target };
+            document.getElementById('modalTitle').textContent = `Link: ${source.name} to ${target.name}`;
+            const form = document.getElementById('modalForm');
+            form.innerHTML = `
+                <h3 class="font-semibold">Auto</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <label>Time (mins)</label><input type="number" id="auto_time" value="10">
+                    <label>Cost (cents)</label><input type="number" id="auto_cost" value="150">
+                </div>
+                <h3 class="font-semibold pt-2 border-t mt-3">Transit</h3>
+                 <div class="grid grid-cols-2 gap-2">
+                    <label>Time (mins)</label><input type="number" id="transit_time" value="20">
+                    <label>Cost (cents)</label><input type="number" id="transit_cost" value="100">
+                    <label>Wait (mins)</label><input type="number" id="transit_wait" value="5">
+                </div>
+            `;
+            linkModal.style.display = 'flex';
+        }
+
+        document.getElementById('saveLinkBtn').addEventListener('click', () => {
+            const newLink = {
+                source: currentLink.source, target: currentLink.target,
+                auto_time: parseFloat(document.getElementById('auto_time').value),
+                auto_cost: parseFloat(document.getElementById('auto_cost').value),
+                transit_time: parseFloat(document.getElementById('transit_time').value),
+                transit_cost: parseFloat(document.getElementById('transit_cost').value),
+                transit_wait: parseFloat(document.getElementById('transit_wait').value)
+            };
+            network.links.push(newLink);
+            updateGraph();
+            linkModal.style.display = 'none';
+        });
+        document.getElementById('cancelLinkBtn').addEventListener('click', () => { linkModal.style.display = 'none'; });
+
+        // --- Utility Functions ---
+        const enableStep = (stepNumber) => {
+            const step = document.getElementById(`step${stepNumber}`);
+            step.dataset.stepStatus = 'enabled';
+            step.setAttribute('open', '');
+            if(stepNumber === 2) {
+                network.nodes = zones.map(z => ({...z}));
+                updateGraph();
+            }
+            if(stepNumber === 3) renderUtilityFunctions();
+            step.scrollIntoView({ behavior: 'smooth' });
+        };
+        
+        const calculateMatrix = (property) => {
+            const matrix = Array(zones.length).fill(Infinity).map(() => Array(zones.length).fill(Infinity));
+            for (let i = 0; i < zones.length; i++) matrix[i][i] = 0;
+            network.links.forEach(l => {
+                matrix[l.source.id][l.target.id] = l[property];
+                matrix[l.target.id][l.source.id] = l[property];
+            });
+
+            // Floyd-Warshall algorithm for all-pairs shortest path
+            for (let k = 0; k < zones.length; k++) {
+                for (let i = 0; i < zones.length; i++) {
+                    for (let j = 0; j < zones.length; j++) {
+                        if (matrix[i][j] > matrix[i][k] + matrix[k][j]) {
+                            matrix[i][j] = matrix[i][k] + matrix[k][j];
+                        }
+                    }
+                }
+            }
+            return matrix;
+        };
+
+        const findShortestPaths = (property) => {
+            const paths = Array(zones.length).fill(null).map(() => Array(zones.length).fill(null));
+            const dist = calculateMatrix(property);
+            const next = Array(zones.length).fill(null).map(() => Array(zones.length).fill(null));
+
+            for (let i = 0; i < zones.length; i++) {
+                for (let j = 0; j < zones.length; j++) {
+                    if (i !== j) {
+                        network.links.forEach(l => {
+                            if ((l.source.id === i && l.target.id === j && dist[i][j] === l[property]) || (l.source.id === j && l.target.id === i && dist[i][j] === l[property])) {
+                                next[i][j] = j;
+                            }
+                        });
+                        if (next[i][j] === null) {
+                            for(let k=0; k < zones.length; k++) {
+                                if (i !== k && j !== k && dist[i][j] === dist[i][k] + dist[k][j]) {
+                                     const link = network.links.find(l => (l.source.id === i && l.target.id === k) || (l.source.id === k && l.target.id === i));
+                                     if(link && dist[i][k] === link[property]) {
+                                         next[i][j] = k;
+                                         break;
+                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+             for (let i = 0; i < zones.length; i++) {
+                for (let j = 0; j < zones.length; j++) {
+                    if (i === j || dist[i][j] === Infinity) continue;
+                    let path = [i];
+                    let at = i;
+                    while(at !== j) {
+                        at = next[at][j];
+                        path.push(at);
+                    }
+                    paths[i][j] = path;
+                }
+            }
+            return paths;
+        }
+
+        // --- Initial State ---
+        addZoneRow({ households: 500, retail: 1200, nonretail: 300 });
+        addZoneRow({ households: 1500, retail: 150, nonretail: 800 });
+        addZoneRow({ households: 800, retail: 400, nonretail: 1500 });
+
+    });
+</script>
+
+</body>
+</html>
+
