@@ -93,7 +93,7 @@
                 <div id="od-card" class="card" style="display: none;">
                     <div class="flex justify-between items-center">
                         <h2>O-D Matrix</h2>
-                        <button id="randomizeODBtn" class="btn btn-secondary btn-sm">Randomize</button>
+                        <button id="loadDefaultODBtn" class="btn btn-secondary btn-sm">Load Default Trips</button>
                     </div>
                     <div id="od-matrix-container" class="overflow-x-auto mt-4"></div>
                     <button id="assignBtn" class="btn btn-primary w-full mt-6 text-lg" disabled>2. Calculate Trip Assignment</button>
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createNodeAtPoint([x, y]) {
-        const name = String.fromCharCode(65 + (nextNodeId % 26));
+        const name = String(nodes.length + 1);
         nodes.push({ id: nextNodeId++, name: name, x, y, fx: x, fy: y });
         update();
         toggleMode('add');
@@ -262,9 +262,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('od-matrix-container').innerHTML = table + `</tbody></table>`;
     }
 
-    function randomizeOD() {
+    function populateDefaultOD() {
+        const defaultODData = {
+            '0-1': 1000, '0-2': 1100, '0-3': 400,  '0-4': 1000, '0-5': 1300,
+            '1-0': 1000, '1-2': 1050, '1-3': 700,  '1-4': 1100, '1-5': 1200,
+            '2-0': 1100, '2-1': 1050, '2-3': 1200, '2-4': 1150, '2-5': 1600,
+            '3-0': 400,  '3-1': 700,  '3-2': 1200, '3-4': 800,  '3-5': 400,
+            '4-0': 1000, '4-1': 1100, '4-2': 1150, '4-3': 800,  '4-5': 700,
+            '5-0': 1300, '5-1': 1200, '5-2': 1600, '5-3': 400,  '5-4': 700
+        };
         document.querySelectorAll('.od-input').forEach(input => {
-            input.value = Math.floor(Math.random() * 451) + 50; // Random number between 50 and 500
+            const key = `${input.dataset.origin}-${input.dataset.dest}`;
+            input.value = defaultODData[key] || 0;
         });
     }
 
@@ -273,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!numNodes || numNodes < 2) return;
         clearAll();
         for (let i = 0; i < numNodes; i++) {
-            nodes.push({ id: nextNodeId++, name: String.fromCharCode(65 + i), x: Math.random() * width, y: Math.random() * height });
+            nodes.push({ id: nextNodeId++, name: String(i + 1), x: Math.random() * width, y: Math.random() * height });
         }
         for (let i = 1; i < numNodes; i++) { // Create a spanning tree to ensure connectivity
             const target = Math.floor(Math.random() * i);
@@ -319,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsBody.innerHTML = resultsTable + `</tbody></table>`;
         document.getElementById('results-card').style.display = 'block';
         document.getElementById('od-card').style.display = 'block';
+        populateDefaultOD();
         document.getElementById('assignBtn').disabled = false;
     }
     
@@ -456,22 +466,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         container.innerHTML += html + `</tbody></table>`;
     }
+
+    function initDefaultNetwork() {
+        clearAll();
+        // Node IDs 0-5 correspond to names '1'-'6'
+        nodes.push({id: 0, name: '1', x: 7*width/8, y: height/4});
+        nodes.push({id: 1, name: '2', x: 7*width/8, y: 3*height/4});
+        nodes.push({id: 2, name: '3', x: width/2, y: 7*height/8});
+        nodes.push({id: 3, name: '4', x: width/8, y: height/2});
+        nodes.push({id: 4, name: '5', x: width/2, y: height/8});
+        nodes.push({id: 5, name: '6', x: 5*width/8, y: height/2});
+        nextNodeId = 6;
+
+        links.push({ source: nodes[0], target: nodes[1], time: 8.4 }); // 1-2
+        links.push({ source: nodes[0], target: nodes[4], time: 12.6 });// 1-5
+        links.push({ source: nodes[0], target: nodes[5], time: 5.0 }); // 1-6
+        links.push({ source: nodes[1], target: nodes[2], time: 7.8 }); // 2-3
+        links.push({ source: nodes[1], target: nodes[5], time: 5.0 }); // 2-6
+        links.push({ source: nodes[2], target: nodes[3], time: 4.3 }); // 3-4
+        links.push({ source: nodes[2], target: nodes[4], time: 4.8 }); // 3-5
+        links.push({ source: nodes[2], target: nodes[5], time: 2.2 }); // 3-6
+        links.push({ source: nodes[3], target: nodes[4], time: 3.3 }); // 4-5
+        links.push({ source: nodes[4], target: nodes[5], time: 7.2 }); // 5-6
+        update();
+    }
     
     document.getElementById('addNodeBtn').addEventListener('click', () => toggleMode('add'));
     document.getElementById('deleteBtn').addEventListener('click', () => toggleMode('delete'));
     document.getElementById('clearBtn').addEventListener('click', clearAll);
     document.getElementById('randomizeNetBtn').addEventListener('click', randomizeNetwork);
-    document.getElementById('randomizeODBtn').addEventListener('click', randomizeOD);
+    document.getElementById('loadDefaultODBtn').addEventListener('click', populateDefaultOD);
     document.getElementById('calculateBtn').addEventListener('click', calculateShortestPaths);
     document.getElementById('assignBtn').addEventListener('click', calculateTripAssignment);
 
     // Initial state
-    nodes.push({id: nextNodeId++, name: 'A', x: width/4, y: height/2});
-    nodes.push({id: nextNodeId++, name: 'B', x: width/2, y: height/2});
-    nodes.push({id: nextNodeId++, name: 'C', x: 3*width/4, y: height/2});
-    links.push({ source: nodes[0], target: nodes[1], time: 10 });
-    links.push({ source: nodes[1], target: nodes[2], time: 12 });
-    update();
+    initDefaultNetwork();
 });
 </script>
 
