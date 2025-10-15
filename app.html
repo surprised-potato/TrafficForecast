@@ -26,6 +26,8 @@
         th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
         input[type="text"], input[type="number"] { width: 100%; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; text-align: center; }
         .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease-in-out; border: none; display: inline-flex; justify-content:center; align-items: center; gap: 0.5rem; }
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem;}
+        .btn-icon { padding: 0.5rem; }
         .btn-primary { background-color: #4f46e5; color: white; } .btn-primary:hover:not(:disabled) { background-color: #4338ca; }
         .btn-secondary { background-color: #e5e7eb; color: #374151; } .btn-secondary:hover { background-color: #d1d5db; }
         .btn:disabled { background-color: #d1d5db; color: #6b7280; cursor: not-allowed; }
@@ -38,10 +40,14 @@
         .nodes circle.selected { stroke: #f97316; stroke-width: 4px; }
         .node-label { font-size: 14px; font-weight:bold; pointer-events: none; text-anchor: middle; fill: white; }
         .link-label { font-size: 10px; fill: #4b5563; font-weight: bold; }
+        .final-map-volume-label { font-size: 12px; font-weight: bold; fill: #1e293b; pointer-events: none; text-anchor: middle; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round; }
+        .legend-item { cursor: pointer; transition: opacity 0.2s; }
+        .legend-item.deselected { opacity: 0.4; }
+
 
         /* Modal Styles */
         .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
-        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 500px; }
+        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 600px; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -62,7 +68,10 @@
         <details id="step1" class="step-card" open>
             <summary>Step 1: Zone & Trip Generation</summary>
             <div class="content space-y-6">
-                <p class="text-gray-600">Define your study area by adding zones and their socio-economic data. The tool will calculate trip productions (P) and attractions (A) based on this data.</p>
+                <div class="flex justify-between items-start">
+                    <p class="text-gray-600 max-w-4xl">Define your study area by adding zones and their socio-economic data. The tool will calculate trip productions (P) and attractions (A) based on this data.</p>
+                    <button id="generationSettingsBtn" class="btn btn-secondary btn-sm">Settings</button>
+                </div>
                 <div>
                     <h3 class="font-semibold text-lg mb-2">Zonal Data</h3>
                     <div class="overflow-x-auto">
@@ -87,7 +96,10 @@
         <details id="step2" class="step-card" data-step-status="disabled">
             <summary>Step 2: Network & Trip Distribution</summary>
             <div class="content space-y-6">
-                <p class="text-gray-600">Create the transportation network by drawing links between the zones defined in Step 1. Enter the travel characteristics for each link, which will be used to automatically calculate travel matrices.</p>
+                 <div class="flex justify-between items-start">
+                    <p class="text-gray-600 max-w-4xl">Create the transportation network by drawing links between the zones defined in Step 1. Enter the travel characteristics for each link, which will be used to automatically calculate travel matrices.</p>
+                    <button id="networkSettingsBtn" class="btn btn-secondary btn-sm">Settings</button>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
                         <h3 class="font-semibold text-lg mb-2">Network Graph</h3>
@@ -143,7 +155,39 @@
         </details>
     </div>
 
-    <!-- Modal for Link Data -->
+    <!-- Modals -->
+    <div id="generationSettingsModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Trip Generation Settings</h2>
+            <div class="space-y-3">
+                <label class="block">Trips per Household</label>
+                <input type="number" id="pRateHH" class="w-full">
+                <label class="block">Trips per Retail Employee</label>
+                <input type="number" id="aRateRetail" class="w-full">
+                <label class="block">Trips per Non-Retail Employee</label>
+                <input type="number" id="aRateNonRetail" class="w-full">
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button id="saveGenerationSettingsBtn" class="btn btn-primary w-full">Save</button>
+                <button onclick="document.getElementById('generationSettingsModal').style.display='none'" class="btn btn-secondary w-full">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="networkSettingsModal" class="modal-backdrop" style="display: none;">
+         <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Network Characteristics</h2>
+            <div id="characteristicsList" class="space-y-2"></div>
+            <div class="flex gap-2 mt-4">
+                <input type="text" id="newCharName" placeholder="New Characteristic Name" class="flex-grow">
+                <button id="addCharBtn" class="btn btn-secondary btn-sm">Add</button>
+            </div>
+             <div class="flex gap-4 mt-6">
+                <button onclick="document.getElementById('networkSettingsModal').style.display='none'" class="btn btn-primary w-full">Done</button>
+            </div>
+        </div>
+    </div>
+
     <div id="linkModal" class="modal-backdrop" style="display: none;">
         <div class="modal-content">
             <h2 id="modalTitle" class="text-xl font-bold mb-4">Add Link Characteristics</h2>
@@ -164,6 +208,17 @@
         let modalODMatrices = {};
         let network = { nodes: [], links: [] };
         let selectedNode = null;
+        let globalLinkVolumes = new Map();
+        let selectedModes = [];
+        let tripRates = { pRateHH: 10, aRateRetail: 4, aRateNonRetail: 2 };
+        let travelCharacteristics = [
+            { name: 'Auto Time (mins)', key: 'auto_time', default: 10, mode: 'Auto' },
+            { name: 'Auto Cost (cents)', key: 'auto_cost', default: 150, mode: 'Auto' },
+            { name: 'Transit Time (mins)', key: 'transit_time', default: 20, mode: 'Transit' },
+            { name: 'Transit Cost (cents)', key: 'transit_cost', default: 100, mode: 'Transit' },
+            { name: 'Transit Wait (mins)', key: 'transit_wait', default: 5, mode: 'Transit' },
+        ];
+
 
         // --- Step 1: Trip Generation ---
         const addZoneBtn = document.getElementById('addZoneBtn');
@@ -211,7 +266,6 @@
             if(e.target.classList.contains('remove-zone-btn')) {
                  const id = parseInt(e.target.dataset.id);
                  zones.splice(id, 1);
-                 // Re-index zones
                  zones.forEach((z, i) => z.id = i);
                  renderZoneTable();
             }
@@ -220,13 +274,8 @@
         addZoneBtn.addEventListener('click', () => addZoneRow());
 
         document.getElementById('calculateGenerationBtn').addEventListener('click', () => {
-            // Hardcoded trip rates (can be moved to UI inputs for more flexibility)
-            const P_RATE = 10; // trips per household
-            const A_RETAIL_RATE = 4;
-            const A_NONRETAIL_RATE = 2;
-
-            productions = zones.map(z => z.households * P_RATE);
-            attractions = zones.map(z => (z.retail * A_RETAIL_RATE) + (z.nonretail * A_NONRETAIL_RATE));
+            productions = zones.map(z => z.households * tripRates.pRateHH);
+            attractions = zones.map(z => (z.retail * tripRates.aRateRetail) + (z.nonretail * tripRates.aRateNonRetail));
             
             const totalP = productions.reduce((a, b) => a + b, 0);
             const totalA = attractions.reduce((a, b) => a + b, 0);
@@ -234,9 +283,10 @@
             if (totalA > 0) {
                 const factor = totalP / totalA;
                 attractions = attractions.map(a => Math.round(a * factor));
-                // Adjust last element to ensure sum is perfect
                 const newTotalA = attractions.reduce((a,b)=>a+b, 0);
-                attractions[attractions.length - 1] += totalP - newTotalA;
+                if (attractions.length > 0) {
+                   attractions[attractions.length - 1] += totalP - newTotalA;
+                }
             }
             
             let paHTML = `<table class="w-full"><thead><tr><th>Zone</th><th>Productions (P)</th><th>Attractions (A)</th></tr></thead><tbody>`;
@@ -250,6 +300,22 @@
             
             enableStep(2);
         });
+        
+        // --- Generation Settings Modal ---
+        document.getElementById('generationSettingsBtn').addEventListener('click', () => {
+            document.getElementById('pRateHH').value = tripRates.pRateHH;
+            document.getElementById('aRateRetail').value = tripRates.aRateRetail;
+            document.getElementById('aRateNonRetail').value = tripRates.aRateNonRetail;
+            document.getElementById('generationSettingsModal').style.display = 'flex';
+        });
+
+        document.getElementById('saveGenerationSettingsBtn').addEventListener('click', () => {
+            tripRates.pRateHH = parseFloat(document.getElementById('pRateHH').value) || 10;
+            tripRates.aRateRetail = parseFloat(document.getElementById('aRateRetail').value) || 4;
+            tripRates.aRateNonRetail = parseFloat(document.getElementById('aRateNonRetail').value) || 2;
+            document.getElementById('generationSettingsModal').style.display = 'none';
+        });
+
 
         // --- Step 2: Network & Distribution ---
         const graphContainer = document.getElementById('graph-container');
@@ -312,10 +378,8 @@
         const linkExists = (n1, n2) => network.links.some(l => (l.source.id === n1.id && l.target.id === n2.id) || (l.source.id === n2.id && l.target.id === n1.id));
         
         document.getElementById('calculateDistributionBtn').addEventListener('click', () => {
-            // 1. Calculate travel time matrix from graph (using Dijkstra)
             const timeMatrix = calculateMatrix('auto_time');
             
-            // 2. Apply Gravity Model
             const frictionFactors = new Map([[1,82],[2,52],[3,50],[4,41],[5,39],[6,26],[7,20],[8,13]]);
             const getFrictionFactor = (time) => {
                 time = Math.round(time);
@@ -352,25 +416,24 @@
             { mode: 'Auto', color: '#3b82f6' },
             { mode: 'Transit', color: '#16a34a' }
         ];
-        const CHARS = ['Constant', 'Time (mins)', 'Cost (cents)', 'Wait Time (mins)'];
         
         function renderUtilityFunctions() {
-            let html = `<table><thead><tr><th>Mode</th>${CHARS.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+            const chars = travelCharacteristics.map(c => c.name);
+            let html = `<table><thead><tr><th>Mode</th><th>Constant</th>${travelCharacteristics.map(c => `<th>${c.name}</th>`).join('')}</tr></thead><tbody>`;
             UTILITY_SPECS.forEach(spec => {
-                html += `<tr><td>${spec.mode}</td>`;
-                CHARS.forEach(char => html += `<td><input type="number" step="0.01" class="utility-coeff" data-mode="${spec.mode}" data-char="${char}"></td>`);
+                html += `<tr><td>${spec.mode}</td><td><input type="number" step="0.01" class="utility-coeff" data-mode="${spec.mode}" data-char="Constant"></td>`;
+                travelCharacteristics.forEach(char => html += `<td><input type="number" step="0.01" class="utility-coeff" data-mode="${spec.mode}" data-char="${char.name}"></td>`);
                 html += `</tr>`;
             });
             document.getElementById('utilityFunctionContainer').innerHTML = html + `</tbody></table>`;
-            // Set default values
-            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Constant"]').value = -0.46;
-            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Time (mins)"]').value = -0.35;
-            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Cost (cents)"]').value = -0.005;
-            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Wait Time (mins)"]').value = -0.08;
-            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Constant"]').value = -0.07;
-            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Time (mins)"]').value = -0.35;
-            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Cost (cents)"]').value = -0.005;
-            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Wait Time (mins)"]').value = -0.08;
+            // Set default values for a more even split
+            document.querySelector('.utility-coeff[data-mode="Auto"][data-char="Constant"]').value = -0.2;
+            document.querySelector('.utility-coeff[data-mode="Transit"][data-char="Constant"]').value = -0.1;
+
+            travelCharacteristics.forEach(c => {
+                 document.querySelector(`.utility-coeff[data-mode="Auto"][data-char="${c.name}"]`).value = c.key.includes('auto') ? -0.1 : 0;
+                 document.querySelector(`.utility-coeff[data-mode="Transit"][data-char="${c.name}"]`).value = c.key.includes('transit') ? -0.1 : 0;
+            });
         }
 
         document.getElementById('calculateModeChoiceBtn').addEventListener('click', () => {
@@ -381,16 +444,11 @@
                 coeffs[mode][char] = parseFloat(input.value) || 0;
             });
 
-            const matrices = {
-                'Time (mins)': calculateMatrix('transit_time'),
-                'Cost (cents)': calculateMatrix('transit_cost'),
-                'Wait Time (mins)': calculateMatrix('transit_wait')
-            };
-            const autoTimeMatrix = calculateMatrix('auto_time');
-            const autoCostMatrix = calculateMatrix('auto_cost');
-
             modalODMatrices = {};
             UTILITY_SPECS.forEach(spec => modalODMatrices[spec.mode] = Array(zones.length).fill(0).map(() => Array(zones.length).fill(0)));
+
+            const matrices = {};
+            travelCharacteristics.forEach(c => matrices[c.name] = calculateMatrix(c.key));
 
             for (let i = 0; i < zones.length; i++) {
                 for (let j = 0; j < zones.length; j++) {
@@ -398,13 +456,16 @@
                     const utilities = {};
                     let sumExpUtility = 0;
                     
-                    const autoUtility = coeffs['Auto']['Constant'] + (coeffs['Auto']['Time (mins)'] * autoTimeMatrix[i][j]) + (coeffs['Auto']['Cost (cents)'] * autoCostMatrix[i][j]) + (coeffs['Auto']['Wait Time (mins)'] * 0);
-                    utilities['Auto'] = autoUtility;
-                    sumExpUtility += Math.exp(autoUtility);
-
-                    const transitUtility = coeffs['Transit']['Constant'] + (coeffs['Transit']['Time (mins)'] * matrices['Time (mins)'][i][j]) + (coeffs['Transit']['Cost (cents)'] * matrices['Cost (cents)'][i][j]) + (coeffs['Transit']['Wait Time (mins)']* matrices['Wait Time (mins)'][i][j]);
-                    utilities['Transit'] = transitUtility;
-                    sumExpUtility += Math.exp(transitUtility);
+                    UTILITY_SPECS.forEach(spec => {
+                        let utility = coeffs[spec.mode]['Constant'] || 0;
+                        travelCharacteristics.forEach(c => {
+                            if(coeffs[spec.mode][c.name]) {
+                                utility += coeffs[spec.mode][c.name] * matrices[c.name][i][j];
+                            }
+                        });
+                        utilities[spec.mode] = utility;
+                        sumExpUtility += Math.exp(utility);
+                    });
                     
                     UTILITY_SPECS.forEach(spec => {
                         const prob = sumExpUtility > 0 ? Math.exp(utilities[spec.mode]) / sumExpUtility : 0;
@@ -428,16 +489,16 @@
 
         // --- Step 4: Trip Assignment ---
         document.getElementById('generateForecastBtn').addEventListener('click', () => {
-            const linkVolumes = new Map();
+            globalLinkVolumes.clear();
             network.links.forEach(l => {
                 const key = `${Math.min(l.source.id, l.target.id)}-${Math.max(l.source.id, l.target.id)}`;
-                linkVolumes.set(key, { link: l, total: 0 });
-                UTILITY_SPECS.forEach(spec => linkVolumes.get(key)[spec.mode] = 0);
+                globalLinkVolumes.set(key, { link: l, total: 0 });
+                UTILITY_SPECS.forEach(spec => globalLinkVolumes.get(key)[spec.mode] = 0);
             });
 
             UTILITY_SPECS.forEach(spec => {
                  const matrix = modalODMatrices[spec.mode];
-                 const timeMatrixKey = spec.mode === 'Auto' ? 'auto_time' : 'transit_time';
+                 const timeMatrixKey = spec.mode === 'Auto' ? 'auto_time' : 'transit_time'; // Simplified assumption
                  const paths = findShortestPaths(timeMatrixKey);
 
                  for (let i = 0; i < zones.length; i++) {
@@ -448,27 +509,28 @@
                                  const u = paths[i][j][k];
                                  const v = paths[i][j][k+1];
                                  const key = `${Math.min(u,v)}-${Math.max(u,v)}`;
-                                 if(linkVolumes.has(key)) {
-                                     linkVolumes.get(key)[spec.mode] += trips;
-                                     linkVolumes.get(key).total += trips;
+                                 if(globalLinkVolumes.has(key)) {
+                                     globalLinkVolumes.get(key)[spec.mode] += trips;
+                                     globalLinkVolumes.get(key).total += trips;
                                  }
                              }
                          }
                      }
                  }
             });
-
-            renderFinalMap(linkVolumes);
+            
+            selectedModes = UTILITY_SPECS.map(s => s.mode);
+            renderFinalMap();
             document.getElementById('assignmentOutput').style.display = 'block';
         });
 
-        function renderFinalMap(linkVolumes) {
+        function renderFinalMap() {
             const container = document.getElementById('final-graph-container');
             container.innerHTML = '';
             const fWidth = container.clientWidth, fHeight = fWidth * 9/16;
             const fSvg = d3.select(container).append("svg").attr("width", fWidth).attr("height", fHeight);
 
-            const maxVolume = d3.max(Array.from(linkVolumes.values()), d => d.total) || 1;
+            const maxVolume = d3.max(Array.from(globalLinkVolumes.values()), d => d.total) || 1;
             const widthScale = d3.scaleLinear().domain([0, maxVolume]).range([2, 20]);
 
             const fSim = d3.forceSimulation(network.nodes)
@@ -476,22 +538,38 @@
                 .force("charge", d3.forceManyBody().strength(-600))
                 .force("center", d3.forceCenter(fWidth / 2, fHeight / 2));
             
-            // Draw stacked segments for links
             const fLinkGroup = fSvg.append("g");
-            linkVolumes.forEach(data => {
+            const fLabelGroup = fSvg.append("g");
+
+            globalLinkVolumes.forEach(data => {
+                let currentTotalVolume = 0;
+                selectedModes.forEach(mode => currentTotalVolume += data[mode]);
+
                 let offset = 0;
                 UTILITY_SPECS.forEach(spec => {
-                    const segmentWidth = (data[spec.mode] / data.total) * widthScale(data.total);
+                    const segmentWidth = selectedModes.includes(spec.mode) ? (data[spec.mode] / currentTotalVolume) * widthScale(currentTotalVolume) : 0;
                     if (segmentWidth > 0) {
                          fLinkGroup.append("line")
                             .datum(data.link)
                             .attr("stroke", spec.color)
-                            .attr("stroke-width", segmentWidth)
-                            .attr("stroke-linecap", "butt")
-                            .style("transform", `translateY(${offset - (widthScale(data.total)/2) + (segmentWidth/2)}px)`);
-                        offset += segmentWidth;
+                            .attr("stroke-width", widthScale(currentTotalVolume))
+                            .attr("stroke-linecap", "butt");
                     }
                 });
+                
+                if (currentTotalVolume > 0) {
+                    let labelColor = '#4b5563'; // Default gray
+                    if (selectedModes.length === 1) {
+                        const spec = UTILITY_SPECS.find(s => s.mode === selectedModes[0]);
+                        if (spec) labelColor = spec.color;
+                    }
+                    fLabelGroup.append("text")
+                        .datum(data.link)
+                        .attr("class", "final-map-volume-label")
+                        .attr("dy", - (widthScale(currentTotalVolume) / 2) - 5)
+                        .style("fill", labelColor)
+                        .text(Math.round(currentTotalVolume));
+                }
             });
             
             const fNodeGroup = fSvg.append("g").selectAll("g").data(network.nodes).enter().append("g");
@@ -509,14 +587,34 @@
                 fLinkGroup.selectAll("line")
                     .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
                     .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+
+                fLabelGroup.selectAll("text")
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
             });
 
-            document.getElementById('legend').innerHTML = UTILITY_SPECS.map(s => `
-                <div class="flex items-center gap-2"><div style="width:20px; height:20px; background-color:${s.color}; border-radius: 4px;"></div><span>${s.mode}</span></div>
-            `).join('');
+            const legendContainer = document.getElementById('legend');
+            legendContainer.innerHTML = '';
+            UTILITY_SPECS.forEach(s => {
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item flex items-center gap-2';
+                if (!selectedModes.includes(s.mode)) {
+                    legendItem.classList.add('deselected');
+                }
+                legendItem.innerHTML = `<div style="width:20px; height:20px; background-color:${s.color}; border-radius: 4px;"></div><span>${s.mode}</span>`;
+                legendItem.addEventListener('click', () => {
+                    if (selectedModes.includes(s.mode)) {
+                        selectedModes = selectedModes.filter(m => m !== s.mode);
+                    } else {
+                        selectedModes.push(s.mode);
+                    }
+                    renderFinalMap(); // Re-render the map with new selections
+                });
+                legendContainer.appendChild(legendItem);
+            });
         }
 
-        // --- Link Modal ---
+        // --- Network Settings & Link Modals ---
         const linkModal = document.getElementById('linkModal');
         let currentLink = {};
         
@@ -524,36 +622,88 @@
             currentLink = { source, target };
             document.getElementById('modalTitle').textContent = `Link: ${source.name} to ${target.name}`;
             const form = document.getElementById('modalForm');
-            form.innerHTML = `
-                <h3 class="font-semibold">Auto</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <label>Time (mins)</label><input type="number" id="auto_time" value="10">
-                    <label>Cost (cents)</label><input type="number" id="auto_cost" value="150">
-                </div>
-                <h3 class="font-semibold pt-2 border-t mt-3">Transit</h3>
-                 <div class="grid grid-cols-2 gap-2">
-                    <label>Time (mins)</label><input type="number" id="transit_time" value="20">
-                    <label>Cost (cents)</label><input type="number" id="transit_cost" value="100">
-                    <label>Wait (mins)</label><input type="number" id="transit_wait" value="5">
-                </div>
-            `;
+            form.innerHTML = '';
+            
+            UTILITY_SPECS.forEach(spec => {
+                const header = document.createElement('h3');
+                header.className = 'font-semibold pt-2 border-t mt-3 first:mt-0 first:border-0';
+                header.textContent = spec.mode;
+                form.appendChild(header);
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 gap-2';
+                
+                travelCharacteristics.filter(c => c.mode === spec.mode || !c.mode).forEach(char => {
+                    grid.innerHTML += `
+                        <label>${char.name.replace(`${spec.mode} `, '')}</label>
+                        <input type="number" id="${char.key}" value="${char.default}">
+                    `;
+                });
+                form.appendChild(grid);
+            });
+
             linkModal.style.display = 'flex';
         }
 
         document.getElementById('saveLinkBtn').addEventListener('click', () => {
-            const newLink = {
-                source: currentLink.source, target: currentLink.target,
-                auto_time: parseFloat(document.getElementById('auto_time').value),
-                auto_cost: parseFloat(document.getElementById('auto_cost').value),
-                transit_time: parseFloat(document.getElementById('transit_time').value),
-                transit_cost: parseFloat(document.getElementById('transit_cost').value),
-                transit_wait: parseFloat(document.getElementById('transit_wait').value)
-            };
+            const newLink = { source: currentLink.source, target: currentLink.target };
+            travelCharacteristics.forEach(char => {
+                newLink[char.key] = parseFloat(document.getElementById(char.key).value);
+            });
             network.links.push(newLink);
             updateGraph();
             linkModal.style.display = 'none';
         });
         document.getElementById('cancelLinkBtn').addEventListener('click', () => { linkModal.style.display = 'none'; });
+        
+        document.getElementById('networkSettingsBtn').addEventListener('click', () => {
+            renderCharacteristicsList();
+            document.getElementById('networkSettingsModal').style.display = 'flex';
+        });
+
+        function renderCharacteristicsList() {
+            const list = document.getElementById('characteristicsList');
+            list.innerHTML = '';
+            travelCharacteristics.forEach((char, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-gray-100 p-2 rounded';
+                item.innerHTML = `
+                    <span>${char.name}</span>
+                    <div class="flex items-center gap-2">
+                        <button class="btn-icon btn-secondary btn-sm" data-index="${index}" title="Randomize Default Value">🎲</button>
+                        <button class="remove-char-btn text-red-500 font-bold" data-index="${index}">✖</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+            list.querySelectorAll('.btn-icon').forEach(btn => btn.addEventListener('click', e => {
+                const index = e.currentTarget.dataset.index;
+                travelCharacteristics[index].default = Math.round(Math.random() * 100);
+                 renderCharacteristicsList();
+            }));
+            list.querySelectorAll('.remove-char-btn').forEach(btn => btn.addEventListener('click', e => {
+                 const index = e.currentTarget.dataset.index;
+                 travelCharacteristics.splice(index, 1);
+                 renderCharacteristicsList();
+                 renderUtilityFunctions();
+            }));
+        }
+
+        document.getElementById('addCharBtn').addEventListener('click', () => {
+            const nameInput = document.getElementById('newCharName');
+            const name = nameInput.value.trim();
+            if (!name) return;
+            travelCharacteristics.push({
+                name: name,
+                key: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+                default: 10,
+                mode: 'Auto' // Assign to a default mode or ask user
+            });
+            nameInput.value = '';
+            renderCharacteristicsList();
+            renderUtilityFunctions();
+        });
+
 
         // --- Utility Functions ---
         const enableStep = (stepNumber) => {
@@ -594,38 +744,42 @@
             const dist = calculateMatrix(property);
             const next = Array(zones.length).fill(null).map(() => Array(zones.length).fill(null));
 
-            for (let i = 0; i < zones.length; i++) {
-                for (let j = 0; j < zones.length; j++) {
-                    if (i !== j) {
-                        network.links.forEach(l => {
-                            if ((l.source.id === i && l.target.id === j && dist[i][j] === l[property]) || (l.source.id === j && l.target.id === i && dist[i][j] === l[property])) {
-                                next[i][j] = j;
-                            }
-                        });
-                        if (next[i][j] === null) {
-                            for(let k=0; k < zones.length; k++) {
-                                if (i !== k && j !== k && dist[i][j] === dist[i][k] + dist[k][j]) {
-                                     const link = network.links.find(l => (l.source.id === i && l.target.id === k) || (l.source.id === k && l.target.id === i));
-                                     if(link && dist[i][k] === link[property]) {
-                                         next[i][j] = k;
-                                         break;
-                                     }
-                                }
-                            }
+            for(let i=0; i<zones.length; i++) {
+                for(let j=0; j<zones.length; j++) {
+                    for(let k=0; k<zones.length; k++) {
+                        if (dist[i][j] > dist[i][k] + dist[k][j]) {
+                            dist[i][j] = dist[i][k] + dist[k][j];
+                            next[i][j] = next[i][k];
                         }
                     }
                 }
             }
-             for (let i = 0; i < zones.length; i++) {
+
+            for (let i = 0; i < zones.length; i++) {
                 for (let j = 0; j < zones.length; j++) {
-                    if (i === j || dist[i][j] === Infinity) continue;
-                    let path = [i];
+                    if (i === j) continue;
                     let at = i;
-                    while(at !== j) {
-                        at = next[at][j];
-                        path.push(at);
+                    const path = [i];
+                    while (at !== j) {
+                        const link = network.links.find(l => (l.source.id === at || l.target.id === at) && dist[at][j] + l[property] === dist[l.source.id === at ? l.target.id : l.source.id][j]);
+                         let nextNode = -1;
+                         for(let k=0; k < zones.length; k++) {
+                            if(dist[at][j] === dist[at][k] + dist[k][j]) {
+                               const directLink = network.links.find(l => (l.source.id === at && l.target.id === k) || (l.target.id === at && l.source.id === k));
+                               if (directLink && directLink[property] === dist[at][k]) {
+                                   nextNode = k;
+                                   break;
+                               }
+                            }
+                         }
+                         if(nextNode !== -1) {
+                            path.push(nextNode);
+                            at = nextNode;
+                         } else {
+                             break; // No path found
+                         }
                     }
-                    paths[i][j] = path;
+                    if (at === j) paths[i][j] = path;
                 }
             }
             return paths;
